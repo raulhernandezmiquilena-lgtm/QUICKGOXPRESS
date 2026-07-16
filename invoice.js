@@ -1,14 +1,13 @@
 // --- FIREBASE CONFIGURATION (Put your real keys here when you want to sync devices) ---
 const firebaseConfig = {
-    apiKey: "YOUR_API_KEY_HERE",
-    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-    databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_PROJECT_ID.appspot.com",
-    messagingSenderId: "YOUR_SENDER_ID",
-    appId: "YOUR_APP_ID"
+    apiKey: "AIzaSyCUSWo4LfsMHqUZGcZjYyI09rH75bi-m68",
+    authDomain: "quickgoxpress.firebaseapp.com",
+    databaseURL: "https://quickgoxpress-default-rtdb.firebaseio.com",
+    projectId: "quickgoxpress",
+    storageBucket: "quickgoxpress.firebasestorage.app",
+    messagingSenderId: "620781894145",
+    appId: "1:620781894145:web:ce9aa6d6cf1f3c2b295e00"
 };
-
 // --- DATABASE HYBRID DETECTOR ---
 let database = null;
 let useFirebase = false;
