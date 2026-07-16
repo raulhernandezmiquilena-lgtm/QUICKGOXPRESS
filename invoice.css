@@ -108,7 +108,7 @@ button {
 
 /* Estilo especial y llamativo para el botón de compartir */
 .btn-share {
-    background: #25d366; /* Verde tipo WhatsApp / Compartir */
+    background: #25d366; /* Verde tipo WhatsApp */
     color: white;
 }
 .btn-share:hover {
@@ -170,7 +170,7 @@ header {
     border-radius: 50%;
     object-fit: cover;
     border: 2px solid #ff4b2b;
-    background: #e2e8f0; /* Fondo gris claro suave para la silueta */
+    background: #e2e8f0;
 }
 
 .file-input-label {
@@ -276,14 +276,13 @@ header {
     margin-bottom: 20px;
 }
 
-/* --- 12 PEOPLE LIST (PC PERFECT LAYOUT) --- */
+/* --- 12 PEOPLE LIST --- */
 .list-container {
     margin-top: 25px;
 }
 
 .list-header {
     display: grid;
-    /* Proporciones perfectas para pantalla de PC */
     grid-template-columns: 1.8fr 1.1fr 1.1fr 1.1fr 1.4fr 1fr;
     font-weight: bold;
     padding: 12px 10px;
@@ -401,7 +400,7 @@ header {
     left: 0;
     right: 0;
     bottom: 0;
-    background-color: #dc3545; /* Red - Inactive */
+    background-color: #dc3545;
     transition: .4s;
     border-radius: 34px;
 }
@@ -419,7 +418,7 @@ header {
 }
 
 input:checked + .slider {
-    background-color: #28a745; /* Green - Active */
+    background-color: #28a745;
 }
 
 input:checked + .slider:before {
@@ -427,13 +426,14 @@ input:checked + .slider:before {
 }
 
 /* --- SCREENSHOT MODE ---
-   Oculta de manera limpia los botones interactivos durante la captura */
+   Oculta los botones interactivos y el contenedor del código secreto al capturar */
 body.screenshot-mode .header-actions,
 body.screenshot-mode .edit-name-btn,
 body.screenshot-mode .file-input-label,
 body.screenshot-mode .settings-panel,
 body.screenshot-mode .file-cell,
-body.screenshot-mode .switch-container {
+body.screenshot-mode .switch-container,
+body.screenshot-mode .code-display-container { /* IMPORTANTE: Oculta el código por completo en la foto */
     visibility: hidden !important;
 }
 
