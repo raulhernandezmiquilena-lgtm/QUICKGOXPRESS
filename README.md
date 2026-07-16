@@ -1,9 +1,14 @@
+
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>QUICKGOXPRESS</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
     <link rel="stylesheet" href="invoice.css">
     <link rel="icon" href="tulogo.jpeg" type="image/jpeg">
 </head>
@@ -53,7 +58,10 @@
                         </div>
                     </div>
                     
-                    <span id="session-code-display" style="font-size: 0.85rem; color: #666; display: block; margin-top: 2px;">Code: ########</span>
+                    <div class="code-display-container" style="display: flex; align-items: center; gap: 8px; margin-top: 2px;">
+                        <span id="session-code-display" style="font-size: 0.85rem; color: #666; font-family: monospace;">Code: ••••••##</span>
+                        <button id="toggle-code-btn" onclick="toggleCodeVisibility()" style="background: none; border: none; padding: 0; margin: 0; cursor: pointer; font-size: 0.85rem; filter: grayscale(100%);" title="Show code">👁️</button>
+                    </div>
                 </div>
             </div>
             
