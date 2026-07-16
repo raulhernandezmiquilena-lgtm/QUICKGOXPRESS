@@ -1,108 +1,163 @@
-// --- LOCAL DATABASE ---
-let currentUserCode = null;
+// --- CONFIGURACIÓN DE FIREBASE (Reemplaza con tus datos reales de Firebase Console) ---
+const firebaseConfig = {
+    apiKey: "TU_API_KEY",
+    authDomain: "TU_PROJECT_ID.firebaseapp.com",
+    databaseURL: "https://TU_PROJECT_ID-default-rtdb.firebaseio.com",
+    projectId: "TU_PROJECT_ID",
+    storageBucket: "TU_PROJECT_ID.appspot.com",
+    messagingSenderId: "TU_MESSAGING_SENDER_ID",
+    appId: "TU_APP_ID"
+};
 
-// Silueta por defecto en formato SVG cuando el usuario no tiene foto cargada
+// Inicializamos Firebase
+firebase.initializeApp(firebaseConfig);
+const database = firebase.database();
+
+// --- VARIABLES DE SESIÓN ---
+let currentUserCode = null;
+let isCodeVisible = false;
+let currentRowsData = []; // Caché local de las filas de la tabla
+
 const DEFAULT_AVATAR = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' fill='%23a0aec0'><circle cx='50' cy='50' r='48' fill='%23e2e8f0'/><circle cx='50' cy='38' r='18'/><path d='M50 62c-18 0-32 8-32 20h64c0-12-14-20-32-20z'/></svg>";
 
-// Show screens
+// Control de vistas
 function showRegister() {
     document.getElementById('auth-options').classList.add('hidden');
     document.getElementById('register-form').classList.remove('hidden');
 }
 
-// Show Login
 function showLogin() {
     document.getElementById('auth-options').classList.add('hidden');
     document.getElementById('login-form').classList.remove('hidden');
 }
 
-// Back to menu
 function backToAuth() {
     document.getElementById('register-form').classList.add('hidden');
     document.getElementById('login-form').classList.add('hidden');
     document.getElementById('auth-options').classList.remove('hidden');
 }
 
-// Generate random 8-digit code and save to LocalStorage
+// Generar código de 8 dígitos y guardarlo en la base de datos en la nube (Sincronizado)
 function generateCode() {
     const randomCode = Math.floor(10000000 + Math.random() * 90000000).toString();
-    
-    let users = JSON.parse(localStorage.getItem('quickgo_users')) || {};
-    
-    if(!users[randomCode]) {
-        users[randomCode] = {
-            username: 'Username',
-            driverName: '',
-            dispatcherName: '',
-            avatar: DEFAULT_AVATAR, // Asigna la silueta por defecto al crear cuenta
-            theme: 'light',
-            rowsData: Array(12).fill(null).map((_, i) => ({
-                id: i + 1,
-                nombre: `Person ${i + 1}`,
-                carga: '',
-                fechaEntrega: '',
-                fechaRecibido: '',
-                activo: false,
-                archivo: null,      // Base64 file string
-                archivoNombre: '',  // File original name
-                archivoTipo: ''     // Mime-type to preview correctly
-            }))
-        };
-        localStorage.setItem('quickgo_users', JSON.stringify(users));
-    }
 
-    document.getElementById('generated-code-display').innerHTML = `
-        Your code is: <br><span style="font-size: 1.8rem; color: #28a745;">${randomCode}</span><br>
-        <small style="color:#555;">Write it down! You will need it to log in.</small>
-    `;
+    // Verificamos en la nube si el código ya existe
+    database.ref('users/' + randomCode).once('value').then((snapshot) => {
+        if (snapshot.exists()) {
+            // Si por alguna razón extraña ya existe, volvemos a generar
+            generateCode();
+        } else {
+            // Si es único, creamos la estructura de datos limpia en la nube
+            const newUser = {
+                username: 'Username',
+                driverName: '',
+                dispatcherName: '',
+                avatar: DEFAULT_AVATAR,
+                theme: 'light',
+                rowsData: Array(12).fill(null).map((_, i) => ({
+                    id: i + 1,
+                    nombre: `Person ${i + 1}`,
+                    carga: '',
+                    fechaEntrega: '',
+                    fechaRecibido: '',
+                    activo: false,
+                    archivo: '',
+                    archivoNombre: '',
+                    archivoTipo: ''
+                }))
+            };
+
+            database.ref('users/' + randomCode).set(newUser).then(() => {
+                document.getElementById('generated-code-display').innerHTML = `
+                    Your code is: <br><span style="font-size: 1.8rem; color: #28a745;">${randomCode}</span><br>
+                    <small style="color:#555;">Write it down! You can use it to log in on any device.</small>
+                `;
+            });
+        }
+    });
 }
 
-// Log in with code
+// Iniciar sesión desde cualquier dispositivo buscando el código en la nube
 function login() {
     const codeInput = document.getElementById('login-code').value.trim();
-    let users = JSON.parse(localStorage.getItem('quickgo_users')) || {};
 
-    if(users[codeInput]) {
-        currentUserCode = codeInput;
-        localStorage.setItem('quickgo_current_session', currentUserCode);
-        loadDashboard();
-    } else {
-        alert("Invalid access code. Please create a code first.");
+    if(codeInput.length !== 8 || isNaN(codeInput)) {
+        alert("Please enter a valid 8-digit numeric code.");
+        return;
     }
+
+    // Buscamos el código en la base de datos en tiempo real de Firebase
+    database.ref('users/' + codeInput).once('value').then((snapshot) => {
+        if(snapshot.exists()) {
+            currentUserCode = codeInput;
+            localStorage.setItem('quickgo_current_session', currentUserCode); // Guarda sesión local para no tener que loguearse siempre
+            loadDashboard();
+        } else {
+            alert("This code does not exist. Please double-check it or create a new account.");
+        }
+    }).catch(err => {
+        console.error("Login error: ", err);
+        alert("Connection error. Please try again.");
+    });
 }
 
-// Load Dashboard with user data
+// Cargar panel con sincronización en tiempo real
 function loadDashboard() {
     document.getElementById('auth-screen').classList.add('hidden');
     document.getElementById('main-dashboard').classList.remove('hidden');
-    document.getElementById('session-code-display').innerText = `Code: ${currentUserCode}`;
 
-    const users = JSON.parse(localStorage.getItem('quickgo_users'));
-    const userData = users[currentUserCode];
+    isCodeVisible = false;
+    updateCodeDisplay();
 
-    // Load username
-    const userName = userData.username || 'Username';
-    document.getElementById('display-user-name').innerText = userName;
-    document.getElementById('edit-user-name-input').value = userName;
+    // ESCUCHADOR EN TIEMPO REAL: Si otro dispositivo cambia un dato, este dispositivo se actualizará automáticamente sin refrescar la página.
+    database.ref('users/' + currentUserCode).on('value', (snapshot) => {
+        const userData = snapshot.val();
+        if(!userData) return;
 
-    // Load Driver & Dispatcher
-    document.getElementById('driver-name-input').value = userData.driverName || '';
-    document.getElementById('dispatcher-name-input').value = userData.dispatcherName || '';
+        // Cargar Nombre de usuario
+        const userName = userData.username || 'Username';
+        document.getElementById('display-user-name').innerText = userName;
+        document.getElementById('edit-user-name-input').value = userName;
 
-    // Load avatar o silueta por defecto si no existe
-    const imgElement = document.getElementById('user-avatar');
-    if(userData.avatar) {
-        imgElement.src = userData.avatar;
-    } else {
-        imgElement.src = DEFAULT_AVATAR;
-    }
-    setTheme(userData.theme || 'light');
+        // Cargar Chofer y Despachador
+        document.getElementById('driver-name-input').value = userData.driverName || '';
+        document.getElementById('dispatcher-name-input').value = userData.dispatcherName || '';
 
-    // Render list
-    renderRows(userData.rowsData);
+        // Cargar Avatar
+        const imgElement = document.getElementById('user-avatar');
+        imgElement.src = userData.avatar || DEFAULT_AVATAR;
+
+        // Establecer Tema
+        setTheme(userData.theme || 'light', false); // false para no re-escribir en bucle
+
+        // Renderizar tabla
+        currentRowsData = userData.rowsData || [];
+        renderRows(currentRowsData);
+    });
 }
 
-// Enable username editing
+// Alternar visibilidad del código
+function toggleCodeVisibility() {
+    isCodeVisible = !isCodeVisible;
+    updateCodeDisplay();
+}
+
+function updateCodeDisplay() {
+    const codeSpan = document.getElementById('session-code-display');
+    const toggleBtn = document.getElementById('toggle-code-btn');
+    
+    if (isCodeVisible) {
+        codeSpan.innerText = `Code: ${currentUserCode}`;
+        toggleBtn.innerText = '🙈';
+        toggleBtn.title = "Hide code";
+    } else {
+        codeSpan.innerText = `Code: ••••••${currentUserCode.slice(-2)}`;
+        toggleBtn.innerText = '👁️';
+        toggleBtn.title = "Show code";
+    }
+}
+
+// Editar nombre de usuario
 function enableEditName() {
     document.getElementById('display-user-name').classList.add('hidden');
     document.querySelector('.edit-name-btn').classList.add('hidden');
@@ -110,41 +165,35 @@ function enableEditName() {
     document.getElementById('edit-user-name-input').focus();
 }
 
-// Save username
 function saveUserName() {
     const newName = document.getElementById('edit-user-name-input').value.trim();
     if(newName) {
         document.getElementById('display-user-name').innerText = newName;
-        
-        let users = JSON.parse(localStorage.getItem('quickgo_users'));
-        users[currentUserCode].username = newName;
-        localStorage.setItem('quickgo_users', JSON.stringify(users));
+        database.ref('users/' + currentUserCode + '/username').set(newName);
     }
-    
     document.getElementById('edit-name-input-container').classList.add('hidden');
     document.getElementById('display-user-name').classList.remove('hidden');
     document.querySelector('.edit-name-btn').classList.remove('hidden');
 }
 
-// Handle enter key on editing
 function handleNameKeypress(event) {
     if (event.key === 'Enter') {
         saveUserName();
     }
 }
 
-// Save Driver & Dispatcher in real time
+// Guardar Chofer y Despachador en la nube
 function saveStaffData() {
     const driver = document.getElementById('driver-name-input').value;
     const dispatcher = document.getElementById('dispatcher-name-input').value;
 
-    let users = JSON.parse(localStorage.getItem('quickgo_users'));
-    users[currentUserCode].driverName = driver;
-    users[currentUserCode].dispatcherName = dispatcher;
-    localStorage.setItem('quickgo_users', JSON.stringify(users));
+    database.ref('users/' + currentUserCode).update({
+        driverName: driver,
+        dispatcherName: dispatcher
+    });
 }
 
-// Render the 12 rows with status text, folder and preview eye button
+// Renderizar filas de forma dinámica
 function renderRows(rowsData) {
     const container = document.getElementById('rows-container');
     container.innerHTML = '';
@@ -152,21 +201,20 @@ function renderRows(rowsData) {
     rowsData.forEach((row, index) => {
         const rowDiv = document.createElement('div');
         rowDiv.className = 'list-item';
-        
-        const tieneArchivo = row.archivo ? true : false;
+        const tieneArchivo = (row.archivo && row.archivo !== "") ? true : false;
 
         rowDiv.innerHTML = `
             <div>
-                <input type="text" value="${row.nombre}" onchange="updateRowData(${index}, 'nombre', this.value)" placeholder="Name">
+                <input type="text" value="${row.nombre || ''}" onchange="updateRowData(${index}, 'nombre', this.value)" placeholder="Name">
             </div>
             <div>
-                <input type="number" value="${row.carga}" onchange="updateRowData(${index}, 'carga', this.value)" placeholder="Load Value ($)">
+                <input type="number" value="${row.carga || ''}" onchange="updateRowData(${index}, 'carga', this.value)" placeholder="Load Value ($)">
             </div>
             <div>
-                <input type="date" value="${row.fechaEntrega}" onchange="updateRowData(${index}, 'fechaEntrega', this.value)">
+                <input type="date" value="${row.fechaEntrega || ''}" onchange="updateRowData(${index}, 'fechaEntrega', this.value)">
             </div>
             <div>
-                <input type="date" value="${row.fechaRecibido}" onchange="updateRowData(${index}, 'fechaRecibido', this.value)">
+                <input type="date" value="${row.fechaRecibido || ''}" onchange="updateRowData(${index}, 'fechaRecibido', this.value)">
             </div>
             <div class="status-container">
                 <span id="status-text-${index}" class="status-label ${row.activo ? 'status-delivered' : 'status-not-delivered'}">
@@ -191,35 +239,22 @@ function renderRows(rowsData) {
     });
 }
 
-// Update row cell in real time
+// Actualizar una celda específica en la nube
 function updateRowData(index, key, value) {
-    let users = JSON.parse(localStorage.getItem('quickgo_users'));
-    users[currentUserCode].rowsData[index][key] = value;
-    localStorage.setItem('quickgo_users', JSON.stringify(users));
+    database.ref('users/' + currentUserCode + '/rowsData/' + index + '/' + key).set(value);
 }
 
-// Active/Inactive Switch with dynamic Delivered/Not Delivered text
+// Activar/Desactivar switch de entregado
 function toggleRowActive(index, isChecked) {
-    let users = JSON.parse(localStorage.getItem('quickgo_users'));
-    users[currentUserCode].rowsData[index].activo = isChecked;
-    localStorage.setItem('quickgo_users', JSON.stringify(users));
-
-    const statusText = document.getElementById(`status-text-${index}`);
-    if (isChecked) {
-        statusText.innerText = 'Delivered';
-        statusText.className = 'status-label status-delivered';
-    } else {
-        statusText.innerText = 'Not Delivered';
-        statusText.className = 'status-label status-not-delivered';
-    }
+    database.ref('users/' + currentUserCode + '/rowsData/' + index + '/activo').set(isChecked);
 }
 
-// Upload row file, saving Base64, original name, and type
+// Subir archivo (se guarda en base64 directamente en el registro de la fila de la base de datos)
 function uploadRowFile(index, event) {
     const file = event.target.files[0];
     if (file) {
-        if (file.size > 1500000) {
-            alert("The file is too large. Please upload a file smaller than 1.5MB.");
+        if (file.size > 800000) { // Límite de 800KB para optimizar la base de datos de texto
+            alert("The file is too large. Please upload a file smaller than 800KB.");
             return;
         }
 
@@ -227,155 +262,131 @@ function uploadRowFile(index, event) {
         reader.onload = function(e) {
             const base64File = e.target.result;
             
-            let users = JSON.parse(localStorage.getItem('quickgo_users'));
-            users[currentUserCode].rowsData[index].archivo = base64File;
-            users[currentUserCode].rowsData[index].archivoNombre = file.name;
-            users[currentUserCode].rowsData[index].archivoTipo = file.type;
-            localStorage.setItem('quickgo_users', JSON.stringify(users));
-
-            // Update the view container to immediately display the eye icon
-            const viewContainer = document.getElementById(`file-view-container-${index}`);
-            viewContainer.innerHTML = `<button onclick="viewRowFile(${index})" class="btn-file-view" title="View: ${file.name}">👁️</button>`;
-            
-            alert(`File "${file.name}" successfully linked to the line!`);
+            database.ref('users/' + currentUserCode + '/rowsData/' + index).update({
+                archivo: base64File,
+                archivoNombre: file.name,
+                archivoTipo: file.type
+            }).then(() => {
+                alert(`File "${file.name}" uploaded and synced on all devices!`);
+            });
         };
         reader.readAsDataURL(file);
     }
 }
 
-// View file function (Opens a new clean tab, supports PDFs, Images, and general documents)
+// Visualizar archivo adjunto
 function viewRowFile(index) {
-    const users = JSON.parse(localStorage.getItem('quickgo_users'));
-    const fileData = users[currentUserCode].rowsData[index].archivo;
-    const fileType = users[currentUserCode].rowsData[index].archivoTipo || 'image/png';
-    const fileName = users[currentUserCode].rowsData[index].archivoNombre || 'document';
-
-    if (fileData) {
-        // Open new tab
-        const newTab = window.open();
-        
-        if (fileType.startsWith('image/') || fileType === 'application/pdf') {
-            // Displays preview directly inside the browser window
-            newTab.document.write(`
-                <html>
-                <head>
-                    <title>QUICKGOXPRESS - Preview: ${fileName}</title>
-                    <style>
-                        body { margin: 0; background: #202020; display: flex; align-items: center; justify-content: center; height: 100vh; font-family: sans-serif; color: white; }
-                        img, embed { max-width: 95%; max-height: 95vh; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
-                        .preview-nav { position: absolute; top: 15px; right: 15px; }
-                        .btn-download { background: #28a745; color: white; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-weight: bold; }
-                    </style>
-                </head>
-                <body>
-                    <div class="preview-nav">
-                        <a href="${fileData}" download="${fileName}" class="btn-download">💾 Download File</a>
-                    </div>
-                    ${fileType === 'application/pdf' 
-                        ? `<embed src="${fileData}" type="application/pdf" width="100%" height="100%">` 
-                        : `<img src="${fileData}" alt="preview">`
-                    }
-                </body>
-                </html>
-            `);
-        } else {
-            // For zip, txt, docx or other formats, it directly triggers download
-            const link = document.createElement('a');
-            link.href = fileData;
-            link.download = fileName;
-            link.click();
-            newTab.close();
-        }
-    } else {
+    const row = currentRowsData[index];
+    if (!row || !row.archivo) {
         alert("No file uploaded for this row.");
+        return;
+    }
+
+    const fileData = row.archivo;
+    const fileType = row.archivoTipo || 'image/png';
+    const fileName = row.archivoNombre || 'document';
+
+    const newTab = window.open();
+    if (fileType.startsWith('image/') || fileType === 'application/pdf') {
+        newTab.document.write(`
+            <html>
+            <head>
+                <title>QUICKGOXPRESS - Preview: ${fileName}</title>
+                <style>
+                    body { margin: 0; background: #202020; display: flex; align-items: center; justify-content: center; height: 100vh; font-family: sans-serif; color: white; }
+                    img, embed { max-width: 95%; max-height: 95vh; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+                    .preview-nav { position: absolute; top: 15px; right: 15px; }
+                    .btn-download { background: #28a745; color: white; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-weight: bold; }
+                </style>
+            </head>
+            <body>
+                <div class="preview-nav">
+                    <a href="${fileData}" download="${fileName}" class="btn-download">💾 Download File</a>
+                </div>
+                ${fileType === 'application/pdf' 
+                    ? `<embed src="${fileData}" type="application/pdf" width="100%" height="100%">` 
+                    : `<img src="${fileData}" alt="preview">`
+                }
+            </body>
+            </html>
+        `);
+    } else {
+        const link = document.createElement('a');
+        link.href = fileData;
+        link.download = fileName;
+        link.click();
+        newTab.close();
     }
 }
 
-// Change avatar picture
+// Subir y actualizar foto de perfil en la nube
 function changeAvatar(event) {
     const file = event.target.files[0];
     if (file) {
         const reader = new FileReader();
         reader.onload = function(e) {
             const base64Img = e.target.result;
-            document.getElementById('user-avatar').src = base64Img;
-
-            let users = JSON.parse(localStorage.getItem('quickgo_users'));
-            users[currentUserCode].avatar = base64Img;
-            localStorage.setItem('quickgo_users', JSON.stringify(users));
+            database.ref('users/' + currentUserCode + '/avatar').set(base64Img);
         };
         reader.readAsDataURL(file);
     }
 }
 
-// Toggle settings panel
 function toggleSettings() {
     const panel = document.getElementById('settings-panel');
     panel.classList.toggle('hidden');
 }
 
-// Toggle Theme (Light/Dark)
-function setTheme(theme) {
+// Tema Claro/Oscuro
+function setTheme(theme, updateDb = true) {
     const dashboard = document.getElementById('main-dashboard');
-    let users = JSON.parse(localStorage.getItem('quickgo_users'));
-
     if (theme === 'dark') {
         dashboard.classList.add('dark-mode');
     } else {
         dashboard.classList.remove('dark-mode');
     }
 
-    if(currentUserCode && users[currentUserCode]) {
-        users[currentUserCode].theme = theme;
-        localStorage.setItem('quickgo_users', JSON.stringify(users));
+    if(updateDb && currentUserCode) {
+        database.ref('users/' + currentUserCode + '/theme').set(theme);
     }
 }
 
-// --- CAPTURA Y COMPARTIR ---
+// Compartir de forma segura
 function shareDashboard() {
     const dashboard = document.getElementById('main-dashboard');
     const settingsPanel = document.getElementById('settings-panel');
 
-    // 1. Ocultamos el panel de ajustes primero
     settingsPanel.classList.add('hidden');
-
-    // 2. Activamos el modo captura (oculta botones interactivos en CSS)
     document.body.classList.add('screenshot-mode');
 
-    // Esperamos un instante (150ms) para que el navegador redibuje la pantalla sin los botones
     setTimeout(() => {
         html2canvas(dashboard, {
-            useCORS: true, // Permite cargar fotos que vengan de internet (como placeholders)
+            useCORS: true,
             allowTaint: true,
-            scale: 2,      // Sube la calidad de la imagen al doble para que se lea perfecto
-            backgroundColor: null // Mantiene la transparencia o fondo según tema
+            scale: 2,
+            backgroundColor: null
         }).then(canvas => {
-            // 3. Desactivamos el modo captura de inmediato
             document.body.classList.remove('screenshot-mode');
-            settingsPanel.classList.remove('hidden'); // Reabrimos la configuración
+            settingsPanel.classList.remove('hidden');
 
-            // 4. Convertimos la captura en un archivo de imagen real
             canvas.toBlob(blob => {
                 if (!blob) {
                     alert("Error generating screenshot");
                     return;
                 }
 
-                const file = new File([blob], `quickgoxpress-${currentUserCode}.png`, { type: 'image/png' });
+                const file = new File([blob], `quickgoxpress.png`, { type: 'image/png' });
 
-                // 5. Intentamos compartir usando el sistema nativo del dispositivo (WhatsApp, Telegram, etc.)
                 if (navigator.canShare && navigator.canShare({ files: [file] })) {
                     navigator.share({
                         files: [file],
                         title: 'QUICKGOXPRESS Dashboard',
-                        text: `Check out my customized QUICKGOXPRESS load board! Code: ${currentUserCode}`
+                        text: `Check out my customized QUICKGOXPRESS load board!`
                     }).catch(error => {
-                        console.log("Sharing cancelled or failed: ", error);
-                        // Descarga de respaldo por si el usuario cancela la compartición directa
+                        console.log("Sharing cancelled: ", error);
                         downloadFallback(canvas);
                     });
                 } else {
-                    // Si el navegador no tiene el botón de compartir directo (como en PCs antiguas), se descarga
                     downloadFallback(canvas);
                 }
             }, 'image/png');
@@ -389,17 +400,20 @@ function shareDashboard() {
     }, 150);
 }
 
-// Descarga la imagen si no se puede compartir directamente
 function downloadFallback(canvas) {
     const link = document.createElement('a');
-    link.download = `QUICKGOXPRESS-${currentUserCode}.png`;
+    link.download = `QUICKGOXPRESS-Board.png`;
     link.href = canvas.toDataURL('image/png');
     link.click();
-    alert("The image of your custom dashboard has been downloaded successfully! You can now send it manually on any social network.");
+    alert("Image downloaded securely!");
 }
 
-// Log out
+// Cerrar Sesión
 function logout() {
+    // Apaga el escuchador en tiempo real para evitar consumo innecesario antes de salir
+    if (currentUserCode) {
+        database.ref('users/' + currentUserCode).off();
+    }
     localStorage.removeItem('quickgo_current_session');
     currentUserCode = null;
     document.getElementById('main-dashboard').classList.add('hidden');
@@ -409,7 +423,7 @@ function logout() {
     document.getElementById('generated-code-display').innerHTML = '';
 }
 
-// Auto login if session exists
+// Auto-login al recargar si ya hay sesión activa en este dispositivo
 window.onload = function() {
     const savedSession = localStorage.getItem('quickgo_current_session');
     if (savedSession) {
