@@ -1,12 +1,12 @@
-// --- CONFIGURACIÓN DE FIREBASE (Reemplaza con tus datos reales de Firebase Console) ---
+// --- CONFIGURACIÓN DE FIREBASE (Reemplaza los valores de abajo con tus datos reales) ---
 const firebaseConfig = {
-    apiKey: "TU_API_KEY",
-    authDomain: "TU_PROJECT_ID.firebaseapp.com",
-    databaseURL: "https://TU_PROJECT_ID-default-rtdb.firebaseio.com",
-    projectId: "TU_PROJECT_ID",
-    storageBucket: "TU_PROJECT_ID.appspot.com",
-    messagingSenderId: "TU_MESSAGING_SENDER_ID",
-    appId: "TU_APP_ID"
+    apiKey: "TU_API_KEY_REAL_AQUI",
+    authDomain: "TU_PROJECT_ID_AQUI.firebaseapp.com",
+    databaseURL: "https://TU_PROJECT_ID_AQUI-default-rtdb.firebaseio.com",
+    projectId: "TU_PROJECT_ID_AQUI",
+    storageBucket: "TU_PROJECT_ID_AQUI.appspot.com",
+    messagingSenderId: "TU_MESSAGING_SENDER_ID_AQUI",
+    appId: "TU_APP_ID_AQUI"
 };
 
 // Inicializamos Firebase
@@ -37,17 +37,17 @@ function backToAuth() {
     document.getElementById('auth-options').classList.remove('hidden');
 }
 
-// Generar código de 8 dígitos y guardarlo en la base de datos en la nube (Sincronizado)
+// Generar código de 8 dígitos y guardarlo en la base de datos en la nube
 function generateCode() {
     const randomCode = Math.floor(10000000 + Math.random() * 90000000).toString();
 
     // Verificamos en la nube si el código ya existe
     database.ref('users/' + randomCode).once('value').then((snapshot) => {
         if (snapshot.exists()) {
-            // Si por alguna razón extraña ya existe, volvemos a generar
+            // Si ya existe, volvemos a generar uno nuevo
             generateCode();
         } else {
-            // Si es único, creamos la estructura de datos limpia en la nube
+            // Si es único, creamos la estructura de datos limpia en Firebase
             const newUser = {
                 username: 'Username',
                 driverName: '',
@@ -74,6 +74,9 @@ function generateCode() {
                 `;
             });
         }
+    }).catch(err => {
+        console.error("Error creating code in cloud: ", err);
+        alert("Database connection error. Check your Firebase credentials in invoice.js");
     });
 }
 
@@ -90,7 +93,7 @@ function login() {
     database.ref('users/' + codeInput).once('value').then((snapshot) => {
         if(snapshot.exists()) {
             currentUserCode = codeInput;
-            localStorage.setItem('quickgo_current_session', currentUserCode); // Guarda sesión local para no tener que loguearse siempre
+            localStorage.setItem('quickgo_current_session', currentUserCode); // Guarda sesión local para evitar logueos continuos
             loadDashboard();
         } else {
             alert("This code does not exist. Please double-check it or create a new account.");
@@ -109,7 +112,7 @@ function loadDashboard() {
     isCodeVisible = false;
     updateCodeDisplay();
 
-    // ESCUCHADOR EN TIEMPO REAL: Si otro dispositivo cambia un dato, este dispositivo se actualizará automáticamente sin refrescar la página.
+    // Sincronización en tiempo real: Si se actualizan los datos en otro dispositivo, se refrescan aquí automáticamente
     database.ref('users/' + currentUserCode).on('value', (snapshot) => {
         const userData = snapshot.val();
         if(!userData) return;
@@ -127,8 +130,8 @@ function loadDashboard() {
         const imgElement = document.getElementById('user-avatar');
         imgElement.src = userData.avatar || DEFAULT_AVATAR;
 
-        // Establecer Tema
-        setTheme(userData.theme || 'light', false); // false para no re-escribir en bucle
+        // Establecer Tema sin escribir en bucle
+        setTheme(userData.theme || 'light', false);
 
         // Renderizar tabla
         currentRowsData = userData.rowsData || [];
@@ -249,11 +252,11 @@ function toggleRowActive(index, isChecked) {
     database.ref('users/' + currentUserCode + '/rowsData/' + index + '/activo').set(isChecked);
 }
 
-// Subir archivo (se guarda en base64 directamente en el registro de la fila de la base de datos)
+// Subir archivo (se guarda en base64 en la base de datos de texto)
 function uploadRowFile(index, event) {
     const file = event.target.files[0];
     if (file) {
-        if (file.size > 800000) { // Límite de 800KB para optimizar la base de datos de texto
+        if (file.size > 800000) { // Límite de 800KB para rendimiento en la nube
             alert("The file is too large. Please upload a file smaller than 800KB.");
             return;
         }
@@ -410,7 +413,6 @@ function downloadFallback(canvas) {
 
 // Cerrar Sesión
 function logout() {
-    // Apaga el escuchador en tiempo real para evitar consumo innecesario antes de salir
     if (currentUserCode) {
         database.ref('users/' + currentUserCode).off();
     }
@@ -423,7 +425,7 @@ function logout() {
     document.getElementById('generated-code-display').innerHTML = '';
 }
 
-// Auto-login al recargar si ya hay sesión activa en este dispositivo
+// Auto-login al recargar
 window.onload = function() {
     const savedSession = localStorage.getItem('quickgo_current_session');
     if (savedSession) {
