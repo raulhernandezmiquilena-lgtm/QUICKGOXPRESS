@@ -1,26 +1,40 @@
-// --- CONFIGURACIÓN DE FIREBASE (Reemplaza los valores de abajo con tus datos reales) ---
+// --- FIREBASE CONFIGURATION (Put your real keys here when you want to sync devices) ---
 const firebaseConfig = {
-    apiKey: "TU_API_KEY_REAL_AQUI",
-    authDomain: "TU_PROJECT_ID_AQUI.firebaseapp.com",
-    databaseURL: "https://TU_PROJECT_ID_AQUI-default-rtdb.firebaseio.com",
-    projectId: "TU_PROJECT_ID_AQUI",
-    storageBucket: "TU_PROJECT_ID_AQUI.appspot.com",
-    messagingSenderId: "TU_MESSAGING_SENDER_ID_AQUI",
-    appId: "TU_APP_ID_AQUI"
+    apiKey: "YOUR_API_KEY_HERE",
+    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+    databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_PROJECT_ID.appspot.com",
+    messagingSenderId: "YOUR_SENDER_ID",
+    appId: "YOUR_APP_ID"
 };
 
-// Inicializamos Firebase
-firebase.initializeApp(firebaseConfig);
-const database = firebase.database();
+// --- DATABASE HYBRID DETECTOR ---
+let database = null;
+let useFirebase = false;
 
-// --- VARIABLES DE SESIÓN ---
+// Check if credentials are set, if not, fallback gracefully to LocalStorage
+if (firebaseConfig.apiKey && firebaseConfig.apiKey !== "YOUR_API_KEY_HERE" && !firebaseConfig.apiKey.includes("TU_API_KEY")) {
+    try {
+        firebase.initializeApp(firebaseConfig);
+        database = firebase.database();
+        useFirebase = true;
+        console.log("QUICKGOXPRESS: Connected to cloud (Firebase).");
+    } catch (e) {
+        console.warn("QUICKGOXPRESS: Firebase initialization failed. Using LocalStorage fallback.", e);
+    }
+} else {
+    console.warn("QUICKGOXPRESS: Firebase not configured. Running in LocalStorage offline mode.");
+}
+
+// --- SESSION VARIABLES ---
 let currentUserCode = null;
 let isCodeVisible = false;
-let currentRowsData = []; // Caché local de las filas de la tabla
+let currentRowsData = [];
 
 const DEFAULT_AVATAR = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' fill='%23a0aec0'><circle cx='50' cy='50' r='48' fill='%23e2e8f0'/><circle cx='50' cy='38' r='18'/><path d='M50 62c-18 0-32 8-32 20h64c0-12-14-20-32-20z'/></svg>";
 
-// Control de vistas
+// View Control
 function showRegister() {
     document.getElementById('auth-options').classList.add('hidden');
     document.getElementById('register-form').classList.remove('hidden');
@@ -37,50 +51,65 @@ function backToAuth() {
     document.getElementById('auth-options').classList.remove('hidden');
 }
 
-// Generar código de 8 dígitos y guardarlo en la base de datos en la nube
+// Generate unique 8-digit access code
 function generateCode() {
     const randomCode = Math.floor(10000000 + Math.random() * 90000000).toString();
 
-    // Verificamos en la nube si el código ya existe
-    database.ref('users/' + randomCode).once('value').then((snapshot) => {
-        if (snapshot.exists()) {
-            // Si ya existe, volvemos a generar uno nuevo
-            generateCode();
-        } else {
-            // Si es único, creamos la estructura de datos limpia en Firebase
-            const newUser = {
-                username: 'Username',
-                driverName: '',
-                dispatcherName: '',
-                avatar: DEFAULT_AVATAR,
-                theme: 'light',
-                rowsData: Array(12).fill(null).map((_, i) => ({
-                    id: i + 1,
-                    nombre: `Person ${i + 1}`,
-                    carga: '',
-                    fechaEntrega: '',
-                    fechaRecibido: '',
-                    activo: false,
-                    archivo: '',
-                    archivoNombre: '',
-                    archivoTipo: ''
-                }))
-            };
+    // Default template data for a clean new user
+    const newUser = {
+        username: 'Username',
+        driverName: '',
+        dispatcherName: '',
+        avatar: DEFAULT_AVATAR,
+        theme: 'light',
+        rowsData: Array(12).fill(null).map((_, i) => ({
+            id: i + 1,
+            nombre: `Person ${i + 1}`,
+            carga: '',
+            fechaEntrega: '',
+            fechaRecibido: '',
+            activo: false,
+            archivo: '',
+            archivoNombre: '',
+            archivoTipo: ''
+        }))
+    };
 
-            database.ref('users/' + randomCode).set(newUser).then(() => {
-                document.getElementById('generated-code-display').innerHTML = `
-                    Your code is: <br><span style="font-size: 1.8rem; color: #28a745;">${randomCode}</span><br>
-                    <small style="color:#555;">Write it down! You can use it to log in on any device.</small>
-                `;
-            });
+    if (useFirebase) {
+        // Firebase Online Generation
+        database.ref('users/' + randomCode).once('value').then((snapshot) => {
+            if (snapshot.exists()) {
+                generateCode(); // Regenerate if collision happens
+            } else {
+                database.ref('users/' + randomCode).set(newUser).then(() => {
+                    displayGeneratedCode(randomCode);
+                });
+            }
+        }).catch(err => {
+            console.error("Firebase write error:", err);
+            alert("Error writing to cloud database.");
+        });
+    } else {
+        // LocalStorage Offline Generation
+        let users = JSON.parse(localStorage.getItem('quickgo_offline_users')) || {};
+        if (users[randomCode]) {
+            generateCode(); // Regenerate if collision happens
+        } else {
+            users[randomCode] = newUser;
+            localStorage.setItem('quickgo_offline_users', JSON.stringify(users));
+            displayGeneratedCode(randomCode);
         }
-    }).catch(err => {
-        console.error("Error creating code in cloud: ", err);
-        alert("Database connection error. Check your Firebase credentials in invoice.js");
-    });
+    }
 }
 
-// Iniciar sesión desde cualquier dispositivo buscando el código en la nube
+function displayGeneratedCode(code) {
+    document.getElementById('generated-code-display').innerHTML = `
+        Your code is: <br><span style="font-size: 1.8rem; color: #28a745;">${code}</span><br>
+        <small style="color:#555;">Write it down! You can use it to log in.</small>
+    `;
+}
+
+// Log in function
 function login() {
     const codeInput = document.getElementById('login-code').value.trim();
 
@@ -89,22 +118,32 @@ function login() {
         return;
     }
 
-    // Buscamos el código en la base de datos en tiempo real de Firebase
-    database.ref('users/' + codeInput).once('value').then((snapshot) => {
-        if(snapshot.exists()) {
+    if (useFirebase) {
+        database.ref('users/' + codeInput).once('value').then((snapshot) => {
+            if(snapshot.exists()) {
+                currentUserCode = codeInput;
+                localStorage.setItem('quickgo_current_session', currentUserCode);
+                loadDashboard();
+            } else {
+                alert("This code does not exist in the database.");
+            }
+        }).catch(err => {
+            console.error("Login error: ", err);
+            alert("Connection error. Try again.");
+        });
+    } else {
+        let users = JSON.parse(localStorage.getItem('quickgo_offline_users')) || {};
+        if (users[codeInput]) {
             currentUserCode = codeInput;
-            localStorage.setItem('quickgo_current_session', currentUserCode); // Guarda sesión local para evitar logueos continuos
+            localStorage.setItem('quickgo_current_session', currentUserCode);
             loadDashboard();
         } else {
-            alert("This code does not exist. Please double-check it or create a new account.");
+            alert("This code does not exist offline.");
         }
-    }).catch(err => {
-        console.error("Login error: ", err);
-        alert("Connection error. Please try again.");
-    });
+    }
 }
 
-// Cargar panel con sincronización en tiempo real
+// Load user dashboard and sync data
 function loadDashboard() {
     document.getElementById('auth-screen').classList.add('hidden');
     document.getElementById('main-dashboard').classList.remove('hidden');
@@ -112,34 +151,45 @@ function loadDashboard() {
     isCodeVisible = false;
     updateCodeDisplay();
 
-    // Sincronización en tiempo real: Si se actualizan los datos en otro dispositivo, se refrescan aquí automáticamente
-    database.ref('users/' + currentUserCode).on('value', (snapshot) => {
-        const userData = snapshot.val();
-        if(!userData) return;
-
-        // Cargar Nombre de usuario
-        const userName = userData.username || 'Username';
-        document.getElementById('display-user-name').innerText = userName;
-        document.getElementById('edit-user-name-input').value = userName;
-
-        // Cargar Chofer y Despachador
-        document.getElementById('driver-name-input').value = userData.driverName || '';
-        document.getElementById('dispatcher-name-input').value = userData.dispatcherName || '';
-
-        // Cargar Avatar
-        const imgElement = document.getElementById('user-avatar');
-        imgElement.src = userData.avatar || DEFAULT_AVATAR;
-
-        // Establecer Tema sin escribir en bucle
-        setTheme(userData.theme || 'light', false);
-
-        // Renderizar tabla
-        currentRowsData = userData.rowsData || [];
-        renderRows(currentRowsData);
-    });
+    if (useFirebase) {
+        // Firebase Cloud Realtime Sync
+        database.ref('users/' + currentUserCode).on('value', (snapshot) => {
+            const userData = snapshot.val();
+            if(!userData) return;
+            applyUserData(userData);
+        });
+    } else {
+        // LocalStorage Sync
+        const users = JSON.parse(localStorage.getItem('quickgo_offline_users')) || {};
+        const userData = users[currentUserCode];
+        if (userData) {
+            applyUserData(userData);
+        }
+    }
 }
 
-// Alternar visibilidad del código
+function applyUserData(userData) {
+    // Apply username
+    const userName = userData.username || 'Username';
+    document.getElementById('display-user-name').innerText = userName;
+    document.getElementById('edit-user-name-input').value = userName;
+
+    // Apply driver & dispatcher
+    document.getElementById('driver-name-input').value = userData.driverName || '';
+    document.getElementById('dispatcher-name-input').value = userData.dispatcherName || '';
+
+    // Apply Avatar
+    document.getElementById('user-avatar').src = userData.avatar || DEFAULT_AVATAR;
+
+    // Apply Theme without rewriting loops
+    setTheme(userData.theme || 'light', false);
+
+    // Render table rows
+    currentRowsData = userData.rowsData || [];
+    renderRows(currentRowsData);
+}
+
+// Show / Hide Code Privacy Toggle
 function toggleCodeVisibility() {
     isCodeVisible = !isCodeVisible;
     updateCodeDisplay();
@@ -160,7 +210,7 @@ function updateCodeDisplay() {
     }
 }
 
-// Editar nombre de usuario
+// Edit Profile Username
 function enableEditName() {
     document.getElementById('display-user-name').classList.add('hidden');
     document.querySelector('.edit-name-btn').classList.add('hidden');
@@ -172,7 +222,7 @@ function saveUserName() {
     const newName = document.getElementById('edit-user-name-input').value.trim();
     if(newName) {
         document.getElementById('display-user-name').innerText = newName;
-        database.ref('users/' + currentUserCode + '/username').set(newName);
+        updateUserField('username', newName);
     }
     document.getElementById('edit-name-input-container').classList.add('hidden');
     document.getElementById('display-user-name').classList.remove('hidden');
@@ -185,18 +235,25 @@ function handleNameKeypress(event) {
     }
 }
 
-// Guardar Chofer y Despachador en la nube
+// Real-time Save Driver & Dispatcher names
 function saveStaffData() {
     const driver = document.getElementById('driver-name-input').value;
     const dispatcher = document.getElementById('dispatcher-name-input').value;
 
-    database.ref('users/' + currentUserCode).update({
-        driverName: driver,
-        dispatcherName: dispatcher
-    });
+    if (useFirebase) {
+        database.ref('users/' + currentUserCode).update({
+            driverName: driver,
+            dispatcherName: dispatcher
+        });
+    } else {
+        let users = JSON.parse(localStorage.getItem('quickgo_offline_users')) || {};
+        users[currentUserCode].driverName = driver;
+        users[currentUserCode].dispatcherName = dispatcher;
+        localStorage.setItem('quickgo_offline_users', JSON.stringify(users));
+    }
 }
 
-// Renderizar filas de forma dinámica
+// Render dynamic rows
 function renderRows(rowsData) {
     const container = document.getElementById('rows-container');
     container.innerHTML = '';
@@ -204,7 +261,7 @@ function renderRows(rowsData) {
     rowsData.forEach((row, index) => {
         const rowDiv = document.createElement('div');
         rowDiv.className = 'list-item';
-        const tieneArchivo = (row.archivo && row.archivo !== "") ? true : false;
+        const hasFile = (row.archivo && row.archivo !== "") ? true : false;
 
         rowDiv.innerHTML = `
             <div>
@@ -234,7 +291,7 @@ function renderRows(rowsData) {
                     📂
                 </label>
                 <div id="file-view-container-${index}">
-                    ${tieneArchivo ? `<button onclick="viewRowFile(${index})" class="btn-file-view" title="View: ${row.archivoNombre}">👁️</button>` : ''}
+                    ${hasFile ? `<button onclick="viewRowFile(${index})" class="btn-file-view" title="View: ${row.archivoNombre}">👁️</button>` : ''}
                 </div>
             </div>
         `;
@@ -242,21 +299,42 @@ function renderRows(rowsData) {
     });
 }
 
-// Actualizar una celda específica en la nube
+// Update specific table cell value
 function updateRowData(index, key, value) {
-    database.ref('users/' + currentUserCode + '/rowsData/' + index + '/' + key).set(value);
+    if (useFirebase) {
+        database.ref('users/' + currentUserCode + '/rowsData/' + index + '/' + key).set(value);
+    } else {
+        let users = JSON.parse(localStorage.getItem('quickgo_offline_users')) || {};
+        users[currentUserCode].rowsData[index][key] = value;
+        localStorage.setItem('quickgo_offline_users', JSON.stringify(users));
+    }
 }
 
-// Activar/Desactivar switch de entregado
+// Handle switch active toggling
 function toggleRowActive(index, isChecked) {
-    database.ref('users/' + currentUserCode + '/rowsData/' + index + '/activo').set(isChecked);
+    if (useFirebase) {
+        database.ref('users/' + currentUserCode + '/rowsData/' + index + '/activo').set(isChecked);
+    } else {
+        let users = JSON.parse(localStorage.getItem('quickgo_offline_users')) || {};
+        users[currentUserCode].rowsData[index].activo = isChecked;
+        localStorage.setItem('quickgo_offline_users', JSON.stringify(users));
+        
+        const statusText = document.getElementById(`status-text-${index}`);
+        if (isChecked) {
+            statusText.innerText = 'Delivered';
+            statusText.className = 'status-label status-delivered';
+        } else {
+            statusText.innerText = 'Not Delivered';
+            statusText.className = 'status-label status-not-delivered';
+        }
+    }
 }
 
-// Subir archivo (se guarda en base64 en la base de datos de texto)
+// File uploading helper
 function uploadRowFile(index, event) {
     const file = event.target.files[0];
     if (file) {
-        if (file.size > 800000) { // Límite de 800KB para rendimiento en la nube
+        if (file.size > 800000) { // Limit to 800KB for offline database performance
             alert("The file is too large. Please upload a file smaller than 800KB.");
             return;
         }
@@ -265,21 +343,40 @@ function uploadRowFile(index, event) {
         reader.onload = function(e) {
             const base64File = e.target.result;
             
-            database.ref('users/' + currentUserCode + '/rowsData/' + index).update({
-                archivo: base64File,
-                archivoNombre: file.name,
-                archivoTipo: file.type
-            }).then(() => {
-                alert(`File "${file.name}" uploaded and synced on all devices!`);
-            });
+            if (useFirebase) {
+                database.ref('users/' + currentUserCode + '/rowsData/' + index).update({
+                    archivo: base64File,
+                    archivoNombre: file.name,
+                    archivoTipo: file.type
+                }).then(() => {
+                    alert(`File "${file.name}" successfully uploaded and synced!`);
+                });
+            } else {
+                let users = JSON.parse(localStorage.getItem('quickgo_offline_users')) || {};
+                users[currentUserCode].rowsData[index].archivo = base64File;
+                users[currentUserCode].rowsData[index].archivoNombre = file.name;
+                users[currentUserCode].rowsData[index].archivoTipo = file.type;
+                localStorage.setItem('quickgo_offline_users', JSON.stringify(users));
+                
+                const viewContainer = document.getElementById(`file-view-container-${index}`);
+                viewContainer.innerHTML = `<button onclick="viewRowFile(${index})" class="btn-file-view" title="View: ${file.name}">👁️</button>`;
+                alert(`File "${file.name}" uploaded locally!`);
+            }
         };
         reader.readAsDataURL(file);
     }
 }
 
-// Visualizar archivo adjunto
+// View linked document
 function viewRowFile(index) {
-    const row = currentRowsData[index];
+    let row;
+    if (useFirebase) {
+        row = currentRowsData[index];
+    } else {
+        const users = JSON.parse(localStorage.getItem('quickgo_offline_users')) || {};
+        row = users[currentUserCode].rowsData[index];
+    }
+
     if (!row || !row.archivo) {
         alert("No file uploaded for this row.");
         return;
@@ -322,14 +419,15 @@ function viewRowFile(index) {
     }
 }
 
-// Subir y actualizar foto de perfil en la nube
+// Change Profile Avatar image
 function changeAvatar(event) {
     const file = event.target.files[0];
     if (file) {
         const reader = new FileReader();
         reader.onload = function(e) {
             const base64Img = e.target.result;
-            database.ref('users/' + currentUserCode + '/avatar').set(base64Img);
+            document.getElementById('user-avatar').src = base64Img;
+            updateUserField('avatar', base64Img);
         };
         reader.readAsDataURL(file);
     }
@@ -340,7 +438,7 @@ function toggleSettings() {
     panel.classList.toggle('hidden');
 }
 
-// Tema Claro/Oscuro
+// Toggle Theme Modes (Light / Dark)
 function setTheme(theme, updateDb = true) {
     const dashboard = document.getElementById('main-dashboard');
     if (theme === 'dark') {
@@ -350,11 +448,11 @@ function setTheme(theme, updateDb = true) {
     }
 
     if(updateDb && currentUserCode) {
-        database.ref('users/' + currentUserCode + '/theme').set(theme);
+        updateUserField('theme', theme);
     }
 }
 
-// Compartir de forma segura
+// Screen capture and secure sharing
 function shareDashboard() {
     const dashboard = document.getElementById('main-dashboard');
     const settingsPanel = document.getElementById('settings-panel');
@@ -411,9 +509,9 @@ function downloadFallback(canvas) {
     alert("Image downloaded securely!");
 }
 
-// Cerrar Sesión
+// Log Out Session
 function logout() {
-    if (currentUserCode) {
+    if (useFirebase && currentUserCode) {
         database.ref('users/' + currentUserCode).off();
     }
     localStorage.removeItem('quickgo_current_session');
@@ -425,7 +523,20 @@ function logout() {
     document.getElementById('generated-code-display').innerHTML = '';
 }
 
-// Auto-login al recargar
+// Offline/Online universal update helper
+function updateUserField(field, value) {
+    if (useFirebase) {
+        database.ref('users/' + currentUserCode + '/' + field).set(value);
+    } else {
+        let users = JSON.parse(localStorage.getItem('quickgo_offline_users')) || {};
+        if (users[currentUserCode]) {
+            users[currentUserCode][field] = value;
+            localStorage.setItem('quickgo_offline_users', JSON.stringify(users));
+        }
+    }
+}
+
+// Auto-login on reload if active session exists
 window.onload = function() {
     const savedSession = localStorage.getItem('quickgo_current_session');
     if (savedSession) {
