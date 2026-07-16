@@ -32,7 +32,7 @@ body {
     border-radius: 16px;
     padding: 30px;
     width: 100%;
-    max-width: 1150px; /* Ancho optimizado para PC */
+    max-width: 1150px;
     box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
     transition: background 0.3s, color 0.3s;
 }
@@ -106,9 +106,8 @@ button {
     color: white;
 }
 
-/* Estilo especial y llamativo para el botón de compartir */
 .btn-share {
-    background: #25d366; /* Verde tipo WhatsApp */
+    background: #25d366;
     color: white;
 }
 .btn-share:hover {
@@ -190,7 +189,6 @@ header {
     box-shadow: 0 2px 5px rgba(0,0,0,0.3);
 }
 
-/* Username editing */
 .brand-details {
     display: flex;
     flex-direction: column;
@@ -307,7 +305,6 @@ header {
     text-align: center;
 }
 
-/* Status Column Styles */
 .status-container {
     display: flex;
     flex-direction: column;
@@ -329,7 +326,6 @@ header {
     color: #dc3545;
 }
 
-/* File Column Styles */
 .file-cell {
     display: flex;
     justify-content: center;
@@ -425,19 +421,18 @@ input:checked + .slider:before {
     transform: translateX(26px);
 }
 
-/* --- SCREENSHOT MODE ---
-   Oculta los botones interactivos y el contenedor del código secreto al capturar */
+/* --- SCREENSHOT PRIVACY MODE --- */
 body.screenshot-mode .header-actions,
 body.screenshot-mode .edit-name-btn,
 body.screenshot-mode .file-input-label,
 body.screenshot-mode .settings-panel,
 body.screenshot-mode .file-cell,
 body.screenshot-mode .switch-container,
-body.screenshot-mode .code-display-container { /* IMPORTANTE: Oculta el código por completo en la foto */
+body.screenshot-mode .code-display-container {
     visibility: hidden !important;
 }
 
-/* Responsive (Mobile View) */
+/* Mobile View Responsive */
 @media (max-width: 900px) {
     .list-header {
         display: none;
