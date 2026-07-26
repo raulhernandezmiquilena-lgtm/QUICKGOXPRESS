@@ -1,3 +1,13 @@
+/*
+  ===================================================================================
+  PROPIEDAD INTELECTUAL Y DERECHOS DE AUTOR RESERVADOS
+  -----------------------------------------------------------------------------------
+  AUTOR: Raul Hernandez
+  SISTEMA: QUICKGOXPRESS - Plataforma de Gestión y Supervisión Logística
+  AÑO: 2026
+  ===================================================================================
+*/
+
 const firebaseConfig = {
     apiKey: "AIzaSyCUSWo4LfsMHqUZGcZjYyI09rH75bi-m68",
     authDomain: "quickgoxpress.firebaseapp.com",
@@ -177,11 +187,54 @@ function loadObserverDashboard() {
     document.getElementById('main-dashboard').classList.add('hidden');
     document.getElementById('observer-dashboard').classList.remove('hidden');
 
-    document.getElementById('display-observer-name').innerText = "Supervisor";
+    // Cargar el nombre guardado del Supervisor
+    if (useFirebase) {
+        database.ref('observers/' + currentObserverCode + '/name').once('value').then((snapshot) => {
+            const savedName = snapshot.val();
+            document.getElementById('display-observer-name').innerText = savedName || "Supervisor";
+        });
+    } else {
+        const savedName = localStorage.getItem(`quickgo_observer_name_${currentObserverCode}`);
+        document.getElementById('display-observer-name').innerText = savedName || "Supervisor";
+    }
+
     document.getElementById('observer-avatar').src = DEFAULT_AVATAR;
 
     updateObserverCodeDisplay();
     renderObserverGrid();
+}
+
+// FUNCIONES PARA CAMBIAR EL NOMBRE DEL SUPERVISOR (LÁPIZ)
+
+function enableEditObserverName() {
+    const container = document.getElementById('edit-observer-name-container');
+    const input = document.getElementById('edit-observer-name-input');
+    const currentName = document.getElementById('display-observer-name').innerText;
+
+    input.value = currentName;
+    container.classList.remove('hidden');
+    input.focus();
+}
+
+function saveObserverName() {
+    const newName = document.getElementById('edit-observer-name-input').value.trim();
+    if (!newName) return;
+
+    document.getElementById('display-observer-name').innerText = newName;
+
+    if (useFirebase) {
+        database.ref('observers/' + currentObserverCode).update({ name: newName });
+    } else {
+        localStorage.setItem(`quickgo_observer_name_${currentObserverCode}`, newName);
+    }
+
+    document.getElementById('edit-observer-name-container').classList.add('hidden');
+}
+
+function handleObserverNameKeypress(event) {
+    if (event.key === 'Enter') {
+        saveObserverName();
+    }
 }
 
 function addAccountToObserver() {
@@ -228,7 +281,6 @@ function addAccountToObserver() {
     }
 }
 
-// NOTIFICACIÓN AUTOMÁTICA AL USUARIO OBSERVADO
 function notifyUserAboutObserver(targetCode) {
     const now = new Date();
     const timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -315,105 +367,40 @@ function renderObserverGrid() {
     });
 }
 
-function updateObserverCardUI(code, data) {
-    const nameElem = document.getElementById(`obs-name-${code}`);
-    const bodyElem = document.getElementById(`obs-body-${code}`);
+function updateObserverCardUI(code, userData) {
+    const nameEl = document.getElementById(`obs-name-${code}`);
+    const bodyEl = document.getElementById(`obs-body-${code}`);
 
-    if (!nameElem || !bodyElem) return;
+    if (!nameEl || !bodyEl || !userData) return;
 
-    if (!data) {
-        nameElem.innerText = "Usuario no encontrado";
-        bodyElem.innerHTML = `<p style="color: var(--primary-red);">No hay datos activos para esta cuenta.</p>`;
-        return;
-    }
+    nameEl.innerText = userData.username || `User ${code}`;
 
-    nameElem.innerText = data.username || 'Usuario Sin Nombre';
+    let rowsHtml = '';
+    const rows = userData.rowsData || [];
 
-    let timeActiveText = "Iniciada recientemente";
-    if (data.observerSessionStart) {
-        const diffMs = Date.now() - data.observerSessionStart;
-        const diffMinutes = Math.floor(diffMs / 60000);
-        const diffHours = (diffMinutes / 60).toFixed(1);
-
-        if (diffMinutes < 60) {
-            timeActiveText = `Hace ${diffMinutes} min.`;
-        } else {
-            timeActiveText = `Hace ${diffHours} horas`;
+    rows.forEach((r) => {
+        if (r.carga || r.fechaEntrega || r.activo) {
+            rowsHtml += `
+                <div style="font-size:0.85rem; padding: 6px 0; border-bottom: 1px dashed var(--border-color); display:flex; justify-content:space-between;">
+                    <span><strong>${r.nombre}:</strong> $${r.carga || '0'}</span>
+                    <span class="status-label ${r.activo ? 'status-delivered' : 'status-not-delivered'}">
+                        ${r.activo ? 'Delivered' : 'Pending'}
+                    </span>
+                </div>
+            `;
         }
-    }
-
-    const rows = data.rowsData || [];
-
-    let rowsHTML = '';
-    rows.forEach((row, index) => {
-        const isCompleted = row.activo;
-        const statusClass = isCompleted ? 'status-delivered' : 'status-not-delivered';
-        const statusText = isCompleted ? 'Realizado' : 'Pending';
-
-        let archivoHTML = '<span style="color: #64748b; font-size: 0.8rem;">❌ Sin adjunto</span>';
-        if (row.archivo) {
-            archivoHTML = `
-                <a href="${row.archivo}" download="${row.archivoNombre || 'adjunto'}" 
-                   style="display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; background: rgba(0, 210, 255, 0.15); border: 1px solid #00d2ff; color: #00d2ff; border-radius: 6px; text-decoration: none; font-size: 0.8rem; font-weight: bold;">
-                    📑 Ver Documento
-                </a>`;
-        }
-
-        rowsHTML += `
-            <div style="display: grid; grid-template-columns: 1.5fr 1fr 1fr 1fr 1fr 1.2fr; gap: 8px; padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.05); align-items: center; font-size: 0.85rem;">
-                <div><strong>${row.nombre || `Persona ${index + 1}`}</strong></div>
-                <div>${row.carga || '<span style="color:#64748b;">-</span>'}</div>
-                <div>${row.fechaEntrega || '<span style="color:#64748b;">-</span>'}</div>
-                <div>${row.fechaRecibido || '<span style="color:#64748b;">-</span>'}</div>
-                <div><span class="status-label ${statusClass}" style="display:inline-block; padding: 2px 8px; font-size: 0.75rem;">${statusText}</span></div>
-                <div>${archivoHTML}</div>
-            </div>
-        `;
     });
 
-    bodyElem.innerHTML = `
-        <div style="display: flex; gap: 20px; font-size: 0.9rem; margin-bottom: 12px; background: rgba(0,0,0,0.2); padding: 8px 12px; border-radius: 6px; flex-wrap: wrap;">
-            <span><strong>Driver:</strong> ${data.driverName || 'N/A'}</span>
-            <span><strong>Dispatcher:</strong> ${data.dispatcherName || 'N/A'}</span>
-            <span style="color: #00d2ff;"><strong>Inicio Observación:</strong> ${timeActiveText}</span>
-        </div>
-        
-        <div style="margin-top: 10px;">
-            <div style="display: grid; grid-template-columns: 1.5fr 1fr 1fr 1fr 1fr 1.2fr; gap: 8px; padding: 6px 8px; background: rgba(255,255,255,0.08); font-weight: bold; font-size: 0.8rem; border-radius: 4px;">
-                <div>Nombre</div>
-                <div>Carga</div>
-                <div>F. Entrega</div>
-                <div>F. Recibido</div>
-                <div>Status</div>
-                <div>Adjunto</div>
-            </div>
-            <div style="max-height: 300px; overflow-y: auto;">
-                ${rowsHTML}
-            </div>
+    bodyEl.innerHTML = `
+        <p style="font-size:0.9rem;"><strong>Driver:</strong> ${userData.driverName || 'N/A'}</p>
+        <p style="font-size:0.9rem; margin-bottom:10px;"><strong>Dispatcher:</strong> ${userData.dispatcherName || 'N/A'}</p>
+        <div style="max-height:150px; overflow-y:auto;">
+            ${rowsHtml || '<p style="color:var(--text-muted); font-size:0.85rem;">No active freight rows.</p>'}
         </div>
     `;
 }
 
-function toggleObserverCodeVisibility() {
-    isObserverCodeVisible = !isObserverCodeVisible;
-    updateObserverCodeDisplay();
-}
-
-function updateObserverCodeDisplay() {
-    const codeSpan = document.getElementById('observer-code-display');
-    const toggleBtn = document.getElementById('toggle-observer-code-btn');
-    if (!codeSpan) return;
-
-    if (isObserverCodeVisible) {
-        codeSpan.innerText = `Code: ${currentObserverCode}`;
-        toggleBtn.innerText = '🙈';
-    } else {
-        codeSpan.innerText = `Code: ••••••••`;
-        toggleBtn.innerText = '👁️';
-    }
-}
-
-// --- PANEL PRINCIPAL DE USUARIO ---
+// --- CARGA Y MANEJO DE USUARIOS REGULARES ---
 
 function loadDashboard() {
     document.getElementById('auth-screen').classList.add('hidden');
@@ -423,155 +410,142 @@ function loadDashboard() {
     if (useFirebase) {
         database.ref('users/' + currentUserCode).on('value', (snapshot) => {
             const data = snapshot.val();
-            if (data) {
-                applyUserData(data);
-            }
+            if (data) renderUserData(data);
         });
     } else {
         let users = JSON.parse(localStorage.getItem('quickgo_offline_users')) || {};
-        const data = users[currentUserCode];
-        if (data) {
-            applyUserData(data);
+        if (users[currentUserCode]) {
+            renderUserData(users[currentUserCode]);
         }
     }
 }
 
-function applyUserData(data) {
+function renderUserData(data) {
     document.getElementById('display-user-name').innerText = data.username || 'Username';
-    document.getElementById('edit-user-name-input').value = data.username || 'Username';
     document.getElementById('user-avatar').src = data.avatar || DEFAULT_AVATAR;
     document.getElementById('driver-name-input').value = data.driverName || '';
     document.getElementById('dispatcher-name-input').value = data.dispatcherName || '';
-    
+
     currentRowsData = data.rowsData || [];
-    renderRows(currentRowsData);
-
-    if (data.theme) {
-        setTheme(data.theme, false);
-    }
-
-    renderNotifications(data.notifications);
+    renderRowsTable();
     updateCodeDisplay();
+    renderNotifications(data.notifications || []);
+    setTheme(data.theme || 'dark');
 }
 
-// RENDERIZADO DE FILAS CON STATUS INTERACTIVO Y BOTÓN DE ADJUNTO ELEGANTE
-function renderRows(rows) {
+function renderRowsTable() {
     const container = document.getElementById('rows-container');
     if (!container) return;
+
     container.innerHTML = '';
 
-    rows.forEach((row, index) => {
-        const item = document.createElement('div');
-        item.className = 'list-item';
-        
-        const isCompleted = row.activo;
-        const statusClass = isCompleted ? 'status-delivered' : 'status-not-delivered';
-        const statusText = isCompleted ? 'Realizado' : 'Pending';
+    currentRowsData.forEach((row, index) => {
+        const rowDiv = document.createElement('div');
+        rowDiv.className = 'list-item';
 
-        const hasFile = row.archivo ? true : false;
-        const fileLabel = hasFile ? `✅ ${row.archivoNombre || 'Guardado'}` : '📁 Adjuntar';
-        const fileStyle = hasFile 
-            ? 'background: rgba(16, 185, 129, 0.2); border: 1px solid #10b981; color: #10b981;' 
-            : 'background: rgba(255, 255, 255, 0.08); border: 1px dashed rgba(255,255,255,0.3); color: #94a3b8;';
-
-        item.innerHTML = `
-            <div><input type="text" value="${row.nombre || ''}" onchange="updateRowData(${index}, 'nombre', this.value)"></div>
-            <div><input type="text" value="${row.carga || ''}" onchange="updateRowData(${index}, 'carga', this.value)"></div>
-            <div><input type="date" value="${row.fechaEntrega || ''}" onchange="updateRowData(${index}, 'fechaEntrega', this.value)"></div>
-            <div><input type="date" value="${row.fechaRecibido || ''}" onchange="updateRowData(${index}, 'fechaRecibido', this.value)"></div>
+        rowDiv.innerHTML = `
+            <div><input type="text" value="${row.nombre}" onchange="updateRowData(${index}, 'nombre', this.value)"></div>
+            <div><input type="number" value="${row.carga}" placeholder="0.00" onchange="updateRowData(${index}, 'carga', this.value)"></div>
+            <div><input type="date" value="${row.fechaEntrega}" onchange="updateRowData(${index}, 'fechaEntrega', this.value)"></div>
+            <div><input type="date" value="${row.fechaRecibido}" onchange="updateRowData(${index}, 'fechaRecibido', this.value)"></div>
             <div>
-                <span class="status-label ${statusClass}" 
-                      onclick="toggleRowStatus(${index})" 
-                      style="cursor: pointer; user-select: none;">
-                    ${statusText}
+                <span onclick="toggleRowStatus(${index})" class="status-label ${row.activo ? 'status-delivered' : 'status-not-delivered'}">
+                    ${row.activo ? 'Delivered' : 'Pending'}
                 </span>
             </div>
             <div>
-                <label style="display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 6px 12px; border-radius: 6px; font-size: 0.8rem; cursor: pointer; transition: all 0.2s ease; ${fileStyle}">
-                    <span>${fileLabel}</span>
-                    <input type="file" style="display: none;" onchange="handleFileUpload(event, ${index})">
-                </label>
+                <input type="file" id="file-${index}" style="display:none;" onchange="handleFileUpload(event, ${index})">
+                <button onclick="document.getElementById('file-${index}').click()" class="btn-small">
+                    ${row.archivo ? '📎 View' : '📁 Add'}
+                </button>
             </div>
         `;
-        container.appendChild(item);
+        container.appendChild(rowDiv);
     });
 }
 
-function toggleRowStatus(index) {
-    const currentStatus = currentRowsData[index].activo || false;
-    const newStatus = !currentStatus;
-    
-    currentRowsData[index].activo = newStatus;
-
-    if (newStatus && !currentRowsData[index].fechaRecibido) {
-        const today = new Date().toISOString().split('T')[0];
-        currentRowsData[index].fechaRecibido = today;
-    }
-
-    saveUserData('rowsData', currentRowsData);
-    renderRows(currentRowsData);
+function updateRowData(index, field, value) {
+    currentRowsData[index][field] = value;
+    saveDataToStorage();
 }
 
-function updateRowData(index, key, value) {
-    currentRowsData[index][key] = value;
-    saveUserData('rowsData', currentRowsData);
+function toggleRowStatus(index) {
+    currentRowsData[index].activo = !currentRowsData[index].activo;
+    renderRowsTable();
+    saveDataToStorage();
 }
 
 function handleFileUpload(event, index) {
     const file = event.target.files[0];
-    if (file) {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            currentRowsData[index].archivo = e.target.result;
-            currentRowsData[index].archivoNombre = file.name;
-            currentRowsData[index].archivoTipo = file.type;
-            saveUserData('rowsData', currentRowsData);
-            renderRows(currentRowsData);
-        };
-        reader.readAsDataURL(file);
-    }
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function (e) {
+        currentRowsData[index].archivo = e.target.result;
+        currentRowsData[index].archivoNombre = file.name;
+        currentRowsData[index].archivoTipo = file.type;
+        renderRowsTable();
+        saveDataToStorage();
+    };
+    reader.readAsDataURL(file);
 }
 
 function saveStaffData() {
     const driverName = document.getElementById('driver-name-input').value;
     const dispatcherName = document.getElementById('dispatcher-name-input').value;
-    saveUserData('driverName', driverName);
-    saveUserData('dispatcherName', dispatcherName);
+
+    if (useFirebase) {
+        database.ref('users/' + currentUserCode).update({
+            driverName: driverName,
+            dispatcherName: dispatcherName
+        });
+    } else {
+        let users = JSON.parse(localStorage.getItem('quickgo_offline_users')) || {};
+        if (users[currentUserCode]) {
+            users[currentUserCode].driverName = driverName;
+            users[currentUserCode].dispatcherName = dispatcherName;
+            localStorage.setItem('quickgo_offline_users', JSON.stringify(users));
+        }
+    }
 }
 
+function saveDataToStorage() {
+    if (useFirebase) {
+        database.ref('users/' + currentUserCode + '/rowsData').set(currentRowsData);
+    } else {
+        let users = JSON.parse(localStorage.getItem('quickgo_offline_users')) || {};
+        if (users[currentUserCode]) {
+            users[currentUserCode].rowsData = currentRowsData;
+            localStorage.setItem('quickgo_offline_users', JSON.stringify(users));
+        }
+    }
+}
+
+// --- UTILIDADES, EDICIÓN Y AJUSTES ---
+
 function enableEditName() {
-    document.getElementById('display-user-name').classList.add('hidden');
-    document.querySelector('.edit-name-btn').classList.add('hidden');
     document.getElementById('edit-name-input-container').classList.remove('hidden');
-    document.getElementById('edit-user-name-input').focus();
+    document.getElementById('edit-user-name-input').value = document.getElementById('display-user-name').innerText;
 }
 
 function saveUserName() {
     const newName = document.getElementById('edit-user-name-input').value.trim();
-    if (newName) {
-        document.getElementById('display-user-name').innerText = newName;
-        saveUserData('username', newName);
+    if (!newName) return;
+
+    if (useFirebase) {
+        database.ref('users/' + currentUserCode).update({ username: newName });
+    } else {
+        let users = JSON.parse(localStorage.getItem('quickgo_offline_users')) || {};
+        if (users[currentUserCode]) {
+            users[currentUserCode].username = newName;
+            localStorage.setItem('quickgo_offline_users', JSON.stringify(users));
+        }
     }
     document.getElementById('edit-name-input-container').classList.add('hidden');
-    document.getElementById('display-user-name').classList.remove('hidden');
-    document.querySelector('.edit-name-btn').classList.remove('hidden');
 }
 
 function handleNameKeypress(e) {
     if (e.key === 'Enter') saveUserName();
-}
-
-function changeAvatar(event) {
-    const file = event.target.files[0];
-    if (file) {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            const base64 = e.target.result;
-            document.getElementById('user-avatar').src = base64;
-            saveUserData('avatar', base64);
-        };
-        reader.readAsDataURL(file);
-    }
 }
 
 function toggleCodeVisibility() {
@@ -580,37 +554,70 @@ function toggleCodeVisibility() {
 }
 
 function updateCodeDisplay() {
-    const codeSpan = document.getElementById('session-code-display');
-    const toggleBtn = document.getElementById('toggle-code-btn');
-    if (!codeSpan) return;
-
-    if (isCodeVisible) {
-        codeSpan.innerText = `Code: ${currentUserCode}`;
-        toggleBtn.innerText = '🙈';
-    } else {
-        codeSpan.innerText = `Code: ••••••••`;
-        toggleBtn.innerText = '👁️';
+    const el = document.getElementById('session-code-display');
+    if (el) {
+        el.innerText = isCodeVisible ? `Code: ${currentUserCode}` : 'Code: ••••••••';
     }
 }
 
-function toggleSettings() {
-    document.getElementById('settings-panel').classList.toggle('hidden');
+function toggleObserverCodeVisibility() {
+    isObserverCodeVisible = !isObserverCodeVisible;
+    updateObserverCodeDisplay();
 }
 
-function setTheme(theme, save = true) {
+function updateObserverCodeDisplay() {
+    const el = document.getElementById('observer-code-display');
+    if (el) {
+        el.innerText = isObserverCodeVisible ? `Code: ${currentObserverCode}` : 'Code: ••••••••';
+    }
+}
+
+function changeAvatar(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function (e) {
+        const base64 = e.target.result;
+        if (useFirebase) {
+            database.ref('users/' + currentUserCode).update({ avatar: base64 });
+        } else {
+            let users = JSON.parse(localStorage.getItem('quickgo_offline_users')) || {};
+            if (users[currentUserCode]) {
+                users[currentUserCode].avatar = base64;
+                localStorage.setItem('quickgo_offline_users', JSON.stringify(users));
+            }
+        }
+    };
+    reader.readAsDataURL(file);
+}
+
+function changeObserverAvatar(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function (e) {
+        document.getElementById('observer-avatar').src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+}
+
+function setTheme(theme) {
     currentTheme = theme;
     if (theme === 'light') {
         document.body.classList.add('light-theme');
     } else {
         document.body.classList.remove('light-theme');
     }
-    if (save && currentUserCode) {
-        saveUserData('theme', theme);
-    }
 }
 
 function toggleNotifications() {
     document.getElementById('notifications-panel').classList.toggle('hidden');
+}
+
+function toggleSettings() {
+    document.getElementById('settings-panel').classList.toggle('hidden');
 }
 
 function renderNotifications(notifs) {
@@ -619,60 +626,45 @@ function renderNotifications(notifs) {
     if (!list) return;
 
     list.innerHTML = '';
-    
-    let notifArray = [];
-    if (notifs) {
-        if (Array.isArray(notifs)) {
-            notifArray = notifs;
-        } else if (typeof notifs === 'object') {
-            notifArray = Object.values(notifs);
-        }
-    }
+    const notifArray = Array.isArray(notifs) ? notifs : Object.values(notifs || {});
 
     if (notifArray.length === 0) {
         list.innerHTML = `<p class="empty-notif">No notifications yet.</p>`;
         badge.classList.add('hidden');
-        badge.innerText = '0';
         return;
     }
 
-    badge.classList.remove('hidden');
     badge.innerText = notifArray.length;
+    badge.classList.remove('hidden');
 
-    notifArray.slice().reverse().forEach(n => {
-        const item = document.createElement('div');
-        item.className = 'notif-card';
-        item.innerHTML = `
-            <p class="notif-msg">${n.message || ''}</p>
-            <span class="notif-time">${n.date || ''} ${n.time || ''}</span>
+    notifArray.reverse().forEach((n) => {
+        const card = document.createElement('div');
+        card.className = 'notif-card';
+        card.innerHTML = `
+            <span class="notif-msg">${n.message}</span>
+            <span class="notif-time">${n.date} - ${n.time}</span>
         `;
-        list.appendChild(item);
+        list.appendChild(card);
     });
 }
 
 function clearNotifications() {
-    saveUserData('notifications', []);
-}
-
-function saveUserData(key, value) {
-    if (!currentUserCode) return;
-
     if (useFirebase) {
-        database.ref('users/' + currentUserCode + '/' + key).set(value);
+        database.ref('users/' + currentUserCode + '/notifications').remove();
     } else {
         let users = JSON.parse(localStorage.getItem('quickgo_offline_users')) || {};
         if (users[currentUserCode]) {
-            users[currentUserCode][key] = value;
+            users[currentUserCode].notifications = [];
             localStorage.setItem('quickgo_offline_users', JSON.stringify(users));
         }
     }
 }
 
 function shareDashboard() {
-    const target = isObserverMode ? document.getElementById('observer-dashboard') : document.getElementById('main-dashboard');
-    html2canvas(target).then(canvas => {
+    const element = document.body;
+    html2canvas(element).then((canvas) => {
         const link = document.createElement('a');
-        link.download = `QUICKGOXPRESS_${currentUserCode || currentObserverCode || 'capture'}.png`;
+        link.download = `QuickGoXpress-Capture-${Date.now()}.png`;
         link.href = canvas.toDataURL();
         link.click();
     });
@@ -681,12 +673,29 @@ function shareDashboard() {
 function logout() {
     currentUserCode = null;
     currentObserverCode = null;
-    isObserverMode = false;
     localStorage.removeItem('quickgo_current_session');
     localStorage.removeItem('quickgo_is_observer');
-    
+
     document.getElementById('main-dashboard').classList.add('hidden');
     document.getElementById('observer-dashboard').classList.add('hidden');
     document.getElementById('auth-screen').classList.remove('hidden');
     backToAuth();
 }
+
+// Auto-login al recargar si hay una sesión activa guardada
+window.addEventListener('DOMContentLoaded', () => {
+    const savedSession = localStorage.getItem('quickgo_current_session');
+    const isObserver = localStorage.getItem('quickgo_is_observer') === 'true';
+
+    if (savedSession) {
+        if (isObserver) {
+            currentObserverCode = savedSession;
+            isObserverMode = true;
+            loadObserverDashboard();
+        } else {
+            currentUserCode = savedSession;
+            isObserverMode = false;
+            loadDashboard();
+        }
+    }
+});
