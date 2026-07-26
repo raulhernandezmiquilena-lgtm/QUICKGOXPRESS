@@ -4,7 +4,6 @@
   -----------------------------------------------------------------------------------
   AUTOR: Raul Hernandez
   SISTEMA: QUICKGOXPRESS - Plataforma de Gestión y Supervisión Logística
-  AÑO: 2026
   ===================================================================================
 */
 
@@ -83,7 +82,7 @@ function generateCode() {
         notifications: [],
         rowsData: Array(12).fill(null).map((_, i) => ({
             id: i + 1,
-            nombre: `Person ${i + 1}`,
+            nombre: `Persona ${i + 1}`,
             carga: '',
             fechaEntrega: '',
             fechaRecibido: '',
@@ -176,9 +175,6 @@ function loginAsObserver() {
     localStorage.setItem('quickgo_current_session', currentObserverCode);
     localStorage.setItem('quickgo_is_observer', 'true');
 
-    const savedTracked = localStorage.getItem(`quickgo_observer_tracked_${currentObserverCode}`);
-    observerTrackedCodes = savedTracked ? JSON.parse(savedTracked) : [];
-
     loadObserverDashboard();
 }
 
@@ -187,24 +183,32 @@ function loadObserverDashboard() {
     document.getElementById('main-dashboard').classList.add('hidden');
     document.getElementById('observer-dashboard').classList.remove('hidden');
 
-    // Cargar el nombre guardado del Supervisor
+    document.getElementById('observer-avatar').src = DEFAULT_AVATAR;
+    updateObserverCodeDisplay();
+
+    // Cargar Nombre y Lista de Cuentas Monitoreadas desde la Base de Datos
     if (useFirebase) {
-        database.ref('observers/' + currentObserverCode + '/name').once('value').then((snapshot) => {
-            const savedName = snapshot.val();
-            document.getElementById('display-observer-name').innerText = savedName || "Supervisor";
+        database.ref('observers/' + currentObserverCode).on('value', (snapshot) => {
+            const obsData = snapshot.val() || {};
+            document.getElementById('display-observer-name').innerText = obsData.name || "Supervisor";
+            
+            let tracked = obsData.tracked || [];
+            if (!Array.isArray(tracked)) tracked = Object.values(tracked);
+            observerTrackedCodes = tracked;
+
+            renderObserverGrid();
         });
     } else {
         const savedName = localStorage.getItem(`quickgo_observer_name_${currentObserverCode}`);
         document.getElementById('display-observer-name').innerText = savedName || "Supervisor";
+
+        const savedTracked = localStorage.getItem(`quickgo_observer_tracked_${currentObserverCode}`);
+        observerTrackedCodes = savedTracked ? JSON.parse(savedTracked) : [];
+        renderObserverGrid();
     }
-
-    document.getElementById('observer-avatar').src = DEFAULT_AVATAR;
-
-    updateObserverCodeDisplay();
-    renderObserverGrid();
 }
 
-// FUNCIONES PARA CAMBIAR EL NOMBRE DEL SUPERVISOR (LÁPIZ)
+// --- CAMBIAR EL NOMBRE DEL SUPERVISOR (LÁPIZ ✏️) ---
 
 function enableEditObserverName() {
     const container = document.getElementById('edit-observer-name-container');
@@ -262,7 +266,6 @@ function addAccountToObserver() {
                 saveObserverTrackedCodes();
                 document.getElementById('add-target-code-input').value = '';
                 notifyUserAboutObserver(targetCode);
-                renderObserverGrid();
             } else {
                 alert("Account not found in database.");
             }
@@ -315,11 +318,17 @@ function notifyUserAboutObserver(targetCode) {
 function removeAccountFromObserver(code) {
     observerTrackedCodes = observerTrackedCodes.filter(c => c !== code);
     saveObserverTrackedCodes();
-    renderObserverGrid();
+    if (!useFirebase) renderObserverGrid();
 }
 
 function saveObserverTrackedCodes() {
-    localStorage.setItem(`quickgo_observer_tracked_${currentObserverCode}`, JSON.stringify(observerTrackedCodes));
+    if (useFirebase) {
+        database.ref('observers/' + currentObserverCode).update({
+            tracked: observerTrackedCodes
+        });
+    } else {
+        localStorage.setItem(`quickgo_observer_tracked_${currentObserverCode}`, JSON.stringify(observerTrackedCodes));
+    }
 }
 
 function renderObserverGrid() {
@@ -367,6 +376,7 @@ function renderObserverGrid() {
     });
 }
 
+// RENDERIZADO DE LA TABLA DETALLADA (IGUAL A LA FOTO)
 function updateObserverCardUI(code, userData) {
     const nameEl = document.getElementById(`obs-name-${code}`);
     const bodyEl = document.getElementById(`obs-body-${code}`);
@@ -375,27 +385,60 @@ function updateObserverCardUI(code, userData) {
 
     nameEl.innerText = userData.username || `User ${code}`;
 
-    let rowsHtml = '';
-    const rows = userData.rowsData || [];
+    const rows = userData.rowsData || Array(12).fill(null).map((_, i) => ({
+        id: i + 1,
+        nombre: `Persona ${i + 1}`,
+        carga: '',
+        fechaEntrega: '',
+        fechaRecibido: '',
+        activo: false,
+        archivo: ''
+    }));
 
+    let rowsHtml = '';
     rows.forEach((r) => {
-        if (r.carga || r.fechaEntrega || r.activo) {
-            rowsHtml += `
-                <div style="font-size:0.85rem; padding: 6px 0; border-bottom: 1px dashed var(--border-color); display:flex; justify-content:space-between;">
-                    <span><strong>${r.nombre}:</strong> $${r.carga || '0'}</span>
-                    <span class="status-label ${r.activo ? 'status-delivered' : 'status-not-delivered'}">
-                        ${r.activo ? 'Delivered' : 'Pending'}
+        const fechaE = r.fechaEntrega ? r.fechaEntrega.split('-').reverse().join('-') : '-';
+        const fechaR = r.fechaRecibido ? r.fechaRecibido.split('-').reverse().join('-') : '-';
+        const adjuntoBtn = r.archivo 
+            ? `<button onclick="window.open('${r.archivo}')" class="btn-small" style="font-size:0.65rem; padding:2px 4px; background:#00d2ff; color:#000;">📄 Ver documento</button>` 
+            : `<span style="color:#ff9999; font-size:0.75rem;">❌ Sin adjunto</span>`;
+
+        rowsHtml += `
+            <div style="display: grid; grid-template-columns: 1.2fr 0.8fr 1fr 1fr 1fr 1.1fr; gap: 4px; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05); align-items: center; font-size: 0.75rem; text-align: center;">
+                <span style="text-align: left; font-weight: bold; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${r.nombre || '-'}</span>
+                <span>${r.carga ? r.carga : '-'}</span>
+                <span>${fechaE}</span>
+                <span>${fechaR}</span>
+                <div>
+                    <span class="status-label ${r.activo ? 'status-delivered' : 'status-not-delivered'}" style="font-size: 0.65rem; padding: 2px 4px;">
+                        ${r.activo ? 'Realizado' : 'Pendiente'}
                     </span>
                 </div>
-            `;
-        }
+                <div>${adjuntoBtn}</div>
+            </div>
+        `;
     });
 
     bodyEl.innerHTML = `
-        <p style="font-size:0.9rem;"><strong>Driver:</strong> ${userData.driverName || 'N/A'}</p>
-        <p style="font-size:0.9rem; margin-bottom:10px;"><strong>Dispatcher:</strong> ${userData.dispatcherName || 'N/A'}</p>
-        <div style="max-height:150px; overflow-y:auto;">
-            ${rowsHtml || '<p style="color:var(--text-muted); font-size:0.85rem;">No active freight rows.</p>'}
+        <div style="font-size:0.85rem; margin-bottom: 12px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+            <span><strong>Conductor:</strong> ${userData.driverName || 'N/A'}</span>
+            <span><strong>Despachador:</strong> ${userData.dispatcherName || 'No disponible'}</span>
+        </div>
+        <div style="font-size:0.8rem; color:#00d2ff; margin-bottom: 10px; font-weight: bold;">
+            Inicio Observación: Hace 0 min.
+        </div>
+        <div style="background: rgba(0,0,0,0.2); border-radius: 6px; padding: 6px; border: 1px solid var(--border-color);">
+            <div style="display: grid; grid-template-columns: 1.2fr 0.8fr 1fr 1fr 1fr 1.1fr; gap: 4px; font-weight: bold; font-size: 0.7rem; color: #00d2ff; border-bottom: 1px solid var(--border-color); padding-bottom: 4px; text-align: center;">
+                <span style="text-align: left;">Nombre</span>
+                <span>Carga</span>
+                <span>F. Entrega</span>
+                <span>F. Recibido</span>
+                <span>Estado</span>
+                <span>Adjunto</span>
+            </div>
+            <div style="max-height: 220px; overflow-y: auto;">
+                ${rowsHtml}
+            </div>
         </div>
     `;
 }
