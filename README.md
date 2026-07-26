@@ -11,18 +11,19 @@
 </head>
 <body>
 
-    <div id="auth-screen" class="auth-container">
-        <div class="brand-logo">
-            <h1><span class="brand-blue">QUICKGO</span><span class="brand-red">XPRESS</span></h1>
-            <p class="brand-tagline">Logistics & Express Freight Tracking</p>
+<div id="auth-screen" class="auth-card">
+    <div id="auth-options">
+        <h2>Bienvenido</h2>
+        <p style="color: var(--text-muted); margin-bottom: 25px;">Selecciona una opción para continuar</p>
+        
+        <div class="auth-buttons-stack">
+            <button class="btn-primary" onclick="showLogin()">🔑 Iniciar Sesión con Código</button>
+            <button class="btn-secondary" onclick="generateCode()">📝 Crear Nueva Cuenta</button>
+            <button class="btn-danger" onclick="showObserverAuth()">👁️ Modo Supervisor / Observador</button>
         </div>
-
-        <div id="auth-options" class="auth-box card-effect">
-            <button onclick="showLogin()" class="btn-action btn-blue">🔑 Log In</button>
-            <button onclick="showRegister()" class="btn-action btn-blue-outline">📝 Create Account</button>
-            <button onclick="showObserverAuth()" class="btn-action btn-red">👁️ Observer Mode</button>
-        </div>
-
+        <div id="generated-code-display" class="code-result"></div>
+    </div>
+    
         <div id="register-form" class="auth-box card-effect hidden">
             <h3>Generate Access Code</h3>
             <button onclick="generateCode()" class="btn-action btn-blue">Generate 8-Digit Code</button>
