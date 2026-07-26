@@ -1,116 +1,165 @@
+
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>QUICKGOXPRESS</title>
-    
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    
+    <link rel="stylesheet" href="invoice.css">
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-
-    <link rel="stylesheet" href="invoice.css">
-    <link rel="icon" href="tulogo.jpg" type="image/jpeg">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body>
 
-    <div id="auth-screen" class="container">
-        <h1 class="brand-title">QUICKGOXPRESS</h1>
-        
-        <div id="auth-options" class="auth-buttons">
-            <button class="btn-primary" onclick="showRegister()">Create Page (Account)</button>
-            <button class="btn-secondary" onclick="showLogin()">Log In</button>
+    <div id="auth-screen" class="auth-container">
+        <div class="brand-logo">
+            <h1><span class="brand-blue">QUICKGO</span><span class="brand-red">XPRESS</span></h1>
+            <p class="brand-tagline">Logistics & Express Freight Tracking</p>
         </div>
 
-        <div id="register-form" class="hidden">
-            <h3>Create your 8-digit access code</h3>
-            <p style="margin-bottom: 15px; font-size: 0.9rem;">Click below to generate your unique and non-transferable code.</p>
-            <button class="btn-primary" onclick="generateCode()">Generate Access Code</button>
-            <div id="generated-code-display" style="margin-top: 15px; font-size: 1.2rem; font-weight: bold; color: #ff4b2b;"></div>
-            <button class="btn-secondary" style="margin-top: 15px;" onclick="backToAuth()">Back</button>
+        <div id="auth-options" class="auth-box card-effect">
+            <button onclick="showLogin()" class="btn-action btn-blue">🔑 Log In</button>
+            <button onclick="showRegister()" class="btn-action btn-blue-outline">📝 Create Account</button>
+            <button onclick="showObserverAuth()" class="btn-action btn-red">👁️ Observer Mode</button>
         </div>
 
-        <div id="login-form" class="hidden">
-            <h3>Enter your 8-digit code</h3>
-            <input type="text" id="login-code" placeholder="8-digit code" maxlength="8">
-            <button class="btn-primary" onclick="login()">Enter</button>
-            <button class="btn-secondary" onclick="backToAuth()">Back</button>
+        <div id="register-form" class="auth-box card-effect hidden">
+            <h3>Generate Access Code</h3>
+            <button onclick="generateCode()" class="btn-action btn-blue">Generate 8-Digit Code</button>
+            <div id="generated-code-display" class="code-display"></div>
+            <button onclick="backToAuth()" class="btn-back">⬅️ Back</button>
+        </div>
+
+        <div id="login-form" class="auth-box card-effect hidden">
+            <h3>User Login</h3>
+            <input type="text" id="login-code" placeholder="Enter 8-digit code" maxlength="8">
+            <button onclick="login()" class="btn-action btn-blue">Enter System</button>
+            <button onclick="backToAuth()" class="btn-back">⬅️ Back</button>
+        </div>
+
+        <div id="observer-form" class="auth-box card-effect hidden">
+            <h3>Supervisor Access</h3>
+            <input type="text" id="observer-code-input" placeholder="Supervisor Code">
+            <button onclick="loginAsObserver()" class="btn-action btn-red">Access as Observer</button>
+            <button onclick="backToAuth()" class="btn-back">⬅️ Back</button>
         </div>
     </div>
 
+    <div id="main-dashboard" class="dashboard-container hidden">
+        
+        <div id="security-notification-banner" class="security-alert hidden"></div>
 
-    <div id="main-dashboard" class="container hidden">
-        <header>
-            <div class="profile-section">
-                <div class="profile-pic-container">
-                    <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' fill='%23a0aec0'><circle cx='50' cy='50' r='48' fill='%23e2e8f0'/><circle cx='50' cy='38' r='18'/><path d='M50 62c-18 0-32 8-32 20h64c0-12-14-20-32-20z'/></svg>" alt="Profile" id="user-avatar" class="profile-pic">
-                    <label for="avatar-upload" class="file-input-label">📷</label>
-                    <input type="file" id="avatar-upload" accept="image/*" style="display: none;" onchange="changeAvatar(event)">
+        <header class="dashboard-header card-effect">
+            <div class="user-profile">
+                <div class="avatar-container">
+                    <img id="user-avatar" src="" alt="Avatar">
+                    <input type="file" id="avatar-input" style="display:none;" onchange="changeAvatar(event)">
+                    <label for="avatar-input" class="avatar-edit-label">✏️</label>
                 </div>
-                <div class="brand-details">
-                    <h2 style="margin: 0; font-size: 1.4rem;">QUICKGOXPRESS</h2>
-                    
-                    <div class="editable-name-container">
-                        <span id="display-user-name" class="user-name-text">Username</span>
-                        <button class="edit-name-btn" onclick="enableEditName()" title="Edit name">✏️ Edit</button>
-                        <div id="edit-name-input-container" class="hidden">
-                            <input type="text" id="edit-user-name-input" onblur="saveUserName()" onkeypress="handleNameKeypress(event)" placeholder="Type your name">
-                        </div>
+                <div class="user-details">
+                    <div class="name-wrapper">
+                        <h2 id="display-user-name">Username</h2>
+                        <button onclick="enableEditName()" class="edit-name-btn">✏️</button>
                     </div>
-                    
-                    <div class="code-display-container" style="display: flex; align-items: center; gap: 8px; margin-top: 2px;">
-                        <span id="session-code-display" style="font-size: 0.85rem; color: #666; font-family: monospace;">Code: ••••••##</span>
-                        <button id="toggle-code-btn" onclick="toggleCodeVisibility()" style="background: none; border: none; padding: 0; margin: 0; cursor: pointer; font-size: 0.85rem; filter: grayscale(100%);" title="Show code">👁️</button>
+                    <div id="edit-name-input-container" class="hidden">
+                        <input type="text" id="edit-user-name-input" onkeypress="handleNameKeypress(event)">
+                        <button onclick="saveUserName()" class="btn-small">💾</button>
+                    </div>
+                    <div class="session-code-wrapper">
+                        <span id="session-code-display">Code: ••••••••</span>
+                        <button id="toggle-code-btn" onclick="toggleCodeVisibility()">👁️</button>
                     </div>
                 </div>
             </div>
             
             <div class="header-actions">
-                <button class="btn-secondary" onclick="toggleSettings()">Customize / Settings</button>
-                <button class="btn-danger" onclick="logout()">Log Out</button>
+                <button onclick="toggleNotifications()" class="btn-action btn-blue-outline notif-btn-wrapper">
+                    🔔 Notifications <span id="notif-badge" class="notif-badge hidden">0</span>
+                </button>
+                <button onclick="toggleSettings()" class="btn-action btn-blue-outline">⚙️ Settings</button>
+                <button onclick="shareDashboard()" class="btn-action btn-blue">📸 Capture</button>
+                <button onclick="logout()" class="btn-action btn-red">Exit</button>
             </div>
         </header>
 
-        <div class="staff-corner-panel">
-            <div class="staff-field">
-                <label for="driver-name-input"><strong>Driver:</strong></label>
-                <input type="text" id="driver-name-input" placeholder="Driver's Name" oninput="saveStaffData()">
+        <div id="notifications-panel" class="notifications-panel card-effect hidden">
+            <div class="notif-header">
+                <h3>Notifications</h3>
+                <button onclick="clearNotifications()" class="btn-small-text">Clear All</button>
             </div>
-            <div class="staff-field">
-                <label for="dispatcher-name-input"><strong>Dispatcher:</strong></label>
-                <input type="text" id="dispatcher-name-input" placeholder="Dispatcher's Name" oninput="saveStaffData()">
-            </div>
-        </div>
-
-        <div id="settings-panel" class="settings-panel hidden">
-            <h3>Customization Settings</h3>
-            <div style="display: flex; gap: 20px; align-items: center; margin-top: 10px; justify-content: center; flex-wrap: wrap;">
-                <div>
-                    <label>List Theme:</label>
-                    <button class="btn-secondary" onclick="setTheme('light')">Light Mode</button>
-                    <button class="btn-primary" onclick="setTheme('dark')">Dark Mode</button>
-                </div>
-                <div style="border-left: 1px solid #ccc; padding-left: 20px;">
-                    <button class="btn-share" onclick="shareDashboard()">🔗 Share Board (Capture)</button>
-                </div>
+            <div id="notifications-list" class="notif-list">
+                <p class="empty-notif">No notifications yet.</p>
             </div>
         </div>
 
-        <div class="list-container">
-            <h3>Load Management Lines</h3>
-            
-            <div class="list-header">
-                <div>Staff Name</div>
-                <div>Load ($)</div>
+        <div id="settings-panel" class="settings-panel card-effect hidden">
+            <h3>Theme Settings</h3>
+            <div class="theme-buttons">
+                <button onclick="setTheme('light')" class="btn-action btn-blue-outline">☀️ Light Mode</button>
+                <button onclick="setTheme('dark')" class="btn-action btn-blue-outline">🌙 Dark Mode</button>
+            </div>
+        </div>
+
+        <section class="staff-section card-effect">
+            <div class="input-group">
+                <label>Driver Name:</label>
+                <input type="text" id="driver-name-input" onchange="saveStaffData()" placeholder="Enter driver name">
+            </div>
+            <div class="input-group">
+                <label>Dispatcher Name:</label>
+                <input type="text" id="dispatcher-name-input" onchange="saveStaffData()" placeholder="Enter dispatcher name">
+            </div>
+        </section>
+
+        <section class="table-section card-effect">
+            <div class="table-header">
+                <div>Name</div>
+                <div>Freight ($)</div>
                 <div>Delivery Date</div>
                 <div>Received Date</div>
-                <div>Status (Delivered / Not Delivered)</div>
-                <div>Files</div>
+                <div>Status</div>
+                <div>Attachment</div>
+            </div>
+            <div id="rows-container" class="rows-container"></div>
+        </section>
+    </div>
+
+    <div id="observer-dashboard" class="dashboard-container hidden">
+        <header class="dashboard-header card-effect">
+            <div class="user-profile">
+                <div class="avatar-container">
+                    <img id="observer-avatar" src="" alt="Observer Avatar">
+                    <input type="file" id="observer-avatar-input" style="display:none;" onchange="changeObserverAvatar(event)">
+                    <label for="observer-avatar-input" class="avatar-edit-label">✏️</label>
+                </div>
+                <div class="user-details">
+                    <div class="name-wrapper">
+                        <h2 id="display-observer-name">Supervisor</h2>
+                        <button onclick="enableEditObserverName()" class="edit-name-btn">✏️</button>
+                    </div>
+                    <div id="edit-observer-name-container" class="hidden">
+                        <input type="text" id="edit-observer-name-input" onkeypress="handleObserverNameKeypress(event)">
+                        <button onclick="saveObserverName()" class="btn-small">💾</button>
+                    </div>
+                    <div class="session-code-wrapper">
+                        <span id="observer-code-display">Code: ••••••••</span>
+                        <button id="toggle-observer-code-btn" onclick="toggleObserverCodeVisibility()">👁️</button>
+                    </div>
+                </div>
             </div>
 
-            <div id="rows-container">
-                </div>
+            <div class="header-actions">
+                <button onclick="shareDashboard()" class="btn-action btn-blue">📸 Capture</button>
+                <button onclick="logout()" class="btn-action btn-red">Exit</button>
+            </div>
+        </header>
+
+        <div class="observer-bar card-effect">
+            <input type="text" id="add-target-code-input" placeholder="Enter 8-digit user code to supervise" maxlength="8">
+            <button onclick="addAccountToObserver()" class="btn-action btn-blue">+ Add Account (Max 8)</button>
         </div>
+
+        <div id="observer-grid-container" class="observer-grid"></div>
     </div>
 
     <script src="invoice.js"></script>
