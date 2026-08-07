@@ -235,21 +235,6 @@ body.light-theme .brand-logo h1 {
     margin: 0 auto;
 }
 
-.security-alert {
-    background-color: rgba(255, 42, 42, 0.15);
-    color: #ff9999;
-    border: 1px solid var(--primary-red);
-    padding: 12px 20px;
-    border-radius: 8px;
-    margin-bottom: 20px;
-    font-weight: 600;
-    text-align: center;
-}
-
-body.light-theme .security-alert {
-    color: #b91c1c;
-}
-
 .dashboard-header {
     display: flex;
     justify-content: space-between;
@@ -352,6 +337,25 @@ body.light-theme .security-alert {
     margin-bottom: 12px;
 }
 
+.notif-card {
+    background: var(--input-bg);
+    border: 1px solid var(--border-color);
+    padding: 10px 14px;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.notif-msg {
+    font-size: 0.9rem;
+}
+
+.notif-time {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
 .btn-small-text {
     background: none;
     border: none;
@@ -367,27 +371,6 @@ body.light-theme .security-alert {
     gap: 10px;
     max-height: 250px;
     overflow-y: auto;
-}
-
-.notif-card {
-    background: var(--input-bg);
-    border: 1px solid var(--border-color);
-    padding: 10px 14px;
-    border-radius: 8px;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-
-.notif-msg {
-    font-size: 0.9rem;
-    color: var(--text-light);
-}
-
-.notif-time {
-    font-size: 0.75rem;
-    color: var(--text-muted);
-    align-self: flex-end;
 }
 
 .empty-notif {
@@ -438,27 +421,28 @@ body.light-theme .security-alert {
 
 .table-section {
     overflow-x: auto;
+    padding-bottom: 15px;
 }
 
 .table-header {
     display: grid;
-    grid-template-columns: 2fr 1.5fr 1.5fr 1.5fr 1.2fr 1fr;
+    grid-template-columns: 2fr 1.2fr 1.2fr 1.2fr 1fr 1fr 1.2fr;
     background: var(--input-bg);
     padding: 14px 16px;
     font-weight: 700;
     color: var(--primary-blue);
     border-bottom: 1px solid var(--border-color);
-    min-width: 700px;
+    min-width: 850px;
 }
 
 .list-item {
     display: grid;
-    grid-template-columns: 2fr 1.5fr 1.5fr 1.5fr 1.2fr 1fr;
+    grid-template-columns: 2fr 1.2fr 1.2fr 1.2fr 1fr 1fr 1.2fr;
     padding: 12px 16px;
     border-bottom: 1px solid var(--border-color);
     align-items: center;
     gap: 10px;
-    min-width: 700px;
+    min-width: 850px;
 }
 
 .list-item input {
@@ -470,12 +454,25 @@ body.light-theme .security-alert {
     color: var(--input-text);
 }
 
+.table-actions {
+    padding: 15px 16px 5px 16px;
+    display: flex;
+    justify-content: flex-start;
+}
+
+.btn-add-row {
+    padding: 10px 20px;
+    font-size: 0.9rem;
+}
+
 .status-label {
     font-size: 0.75rem;
     font-weight: 700;
     padding: 4px 8px;
     border-radius: 6px;
     text-align: center;
+    cursor: pointer;
+    user-select: none;
 }
 
 .status-delivered { background: rgba(34, 197, 94, 0.2); color: #4ade80; border: 1px solid #22c55e; }
@@ -504,33 +501,12 @@ body.light-theme .status-not-delivered { color: #dc2626; }
 
 .observer-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
     gap: 20px;
 }
-/*
-  ===================================================================================
-  PROPIEDAD INTELECTUAL Y DERECHOS DE AUTOR RESERVADOS
-  -----------------------------------------------------------------------------------
-  AUTOR: Raul Hernandez
-  SISTEMA: QUICKGOXPRESS - Plataforma de Gestión y Supervisión Logística
-  AÑO: 2026
-  
-  AVISO LEGAL: Este software y su código fuente son creación exclusiva de
-  Raul Hernandez. Queda estrictamente prohibida su copia, distribución, modificación
-  o uso comercial no autorizado sin el consentimiento previo de su autor.
-  ===================================================================================
-*/
+
 .observer-account-section {
     border-top: 4px solid var(--primary-red);
-}
-
-.observer-card-header {
-    padding: 12px 16px;
-    background: var(--input-bg);
-    border-bottom: 1px solid var(--border-color);
-}
-
-.observer-card-body {
     padding: 16px;
 }
 
@@ -538,9 +514,10 @@ body.light-theme .status-not-delivered { color: #dc2626; }
     background: var(--primary-blue);
     color: #fff;
     border: none;
-    padding: 4px 8px;
-    border-radius: 4px;
+    padding: 6px 12px;
+    border-radius: 6px;
     cursor: pointer;
+    font-weight: 600;
 }
 
 @media (max-width: 768px) {
