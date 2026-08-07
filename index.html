@@ -46,9 +46,6 @@
     </div>
 
     <div id="main-dashboard" class="dashboard-container hidden">
-        
-        <div id="security-notification-banner" class="security-alert hidden"></div>
-
         <header class="dashboard-header card-effect">
             <div class="user-profile">
                 <div class="avatar-container">
@@ -117,10 +114,15 @@
                 <div>Freight ($)</div>
                 <div>Delivery Date</div>
                 <div>Received Date</div>
+                <div>Time Reg.</div>
                 <div>Status</div>
                 <div>Attachment</div>
             </div>
             <div id="rows-container" class="rows-container"></div>
+            
+            <div class="table-actions">
+                <button onclick="addNewRow()" class="btn-action btn-blue btn-add-row">➕ Add Row</button>
+            </div>
         </section>
     </div>
 
