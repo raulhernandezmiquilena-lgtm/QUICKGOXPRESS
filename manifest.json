@@ -4,6 +4,11 @@
   "icons": [
     {
       "src": "tulogo.jpeg",
+      "sizes": "192x192",
+      "type": "image/jpeg"
+    },
+    {
+      "src": "tulogo.jpeg",
       "sizes": "512x512",
       "type": "image/jpeg"
     }
