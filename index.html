@@ -8,13 +8,14 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-     <link rel="icon" type="image/jpeg" sizes="32x32" href="tulogo.jpeg">
-<link rel="icon" type="image/jpeg" sizes="16x16" href="tulogo.jpeg">
-
-<link rel="apple-touch-icon" sizes="180x180" href="tulogo.jpeg">
-
-<link rel="manifest" href="site.webmanifest">
-<meta name="theme-color" content="#0a0f1d">
+<!-- Configuración para Instalación PWA -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#00f2ff">
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js');
+  }
+</script>
 </head>
 <body>
 
