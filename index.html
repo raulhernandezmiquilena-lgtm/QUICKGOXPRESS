@@ -1,20 +1,31 @@
-
-<html lang="en">
+<!DOCTYPE html>
+<html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>QUICKGOXPRESS</title>
-    
-    <link rel="icon" type="image/jpeg" href="tulogo.jpeg">
-    <link rel="apple-touch-icon" href="tulogo.jpeg">
-    
+    <title>QUICKGOXPRESS - Logistics & Freight Tracking</title>
     <link rel="stylesheet" href="invoice.css">
+    <!-- Firebase Libraries -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <!-- Capture Library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <!-- Icono de la pestaña (Favicon) -->
+<link rel="icon" type="image/png" href="./favicon.png">
+
+<!-- Configuración de la App descargable (PWA) -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#00d2ff">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="QuickGoXpress">
+
+<!-- Icono para iPhone / iPad / Android al instalar -->
+<link rel="apple-touch-icon" href="./favicon.png">
 </head>
 <body>
 
+    <!-- AUTHENTICATION SCREEN -->
     <div id="auth-screen" class="auth-container">
         <div class="brand-logo">
             <h1><span class="brand-blue">QUICKGO</span><span class="brand-red">XPRESS</span></h1>
@@ -22,33 +33,34 @@
         </div>
 
         <div id="auth-options" class="auth-box card-effect">
-            <button onclick="showLogin()" class="btn-action btn-blue">🔑 Log In</button>
-            <button onclick="showRegister()" class="btn-action btn-blue-outline">📝 Create Account</button>
-            <button onclick="showObserverAuth()" class="btn-action btn-red">👁️ Observer Mode</button>
+            <button onclick="showLogin()" class="btn-action btn-blue">🔑 Iniciar Sesión</button>
+            <button onclick="showRegister()" class="btn-action btn-blue-outline">📝 Crear Cuenta</button>
+            <button onclick="showObserverAuth()" class="btn-action btn-red">👁️ Modo Observador</button>
         </div>
 
         <div id="register-form" class="auth-box card-effect hidden">
-            <h3>Generate Access Code</h3>
-            <button onclick="generateCode()" class="btn-action btn-blue">Generate 8-Digit Code</button>
+            <h3>Generar Código de Acceso</h3>
+            <button onclick="generateCode()" class="btn-action btn-blue">Generar Código (8 Dígitos)</button>
             <div id="generated-code-display" class="code-display"></div>
-            <button onclick="backToAuth()" class="btn-back">⬅️ Back</button>
+            <button onclick="backToAuth()" class="btn-back">⬅️ Volver</button>
         </div>
 
         <div id="login-form" class="auth-box card-effect hidden">
-            <h3>User Login</h3>
-            <input type="text" id="login-code" placeholder="Enter 8-digit code" maxlength="8">
-            <button onclick="login()" class="btn-action btn-blue">Enter System</button>
-            <button onclick="backToAuth()" class="btn-back">⬅️ Back</button>
+            <h3>Ingreso de Usuario</h3>
+            <input type="text" id="login-code" placeholder="Código de 8 dígitos" maxlength="8">
+            <button onclick="login()" class="btn-action btn-blue">Entrar al Sistema</button>
+            <button onclick="backToAuth()" class="btn-back">⬅️ Volver</button>
         </div>
 
         <div id="observer-form" class="auth-box card-effect hidden">
-            <h3>Supervisor Access</h3>
-            <input type="text" id="observer-code-input" placeholder="Supervisor Code">
-            <button onclick="loginAsObserver()" class="btn-action btn-red">Access as Observer</button>
-            <button onclick="backToAuth()" class="btn-back">⬅️ Back</button>
+            <h3>Acceso de Supervisor</h3>
+            <input type="text" id="observer-code-input" placeholder="Código de Supervisor">
+            <button onclick="loginAsObserver()" class="btn-action btn-red">Ingresar como Observador</button>
+            <button onclick="backToAuth()" class="btn-back">⬅️ Volver</button>
         </div>
     </div>
 
+    <!-- MAIN USER DASHBOARD -->
     <div id="main-dashboard" class="dashboard-container hidden">
         <header class="dashboard-header card-effect">
             <div class="user-profile">
@@ -59,7 +71,7 @@
                 </div>
                 <div class="user-details">
                     <div class="name-wrapper">
-                        <h2 id="display-user-name">Username</h2>
+                        <h2 id="display-user-name">Usuario</h2>
                         <button onclick="enableEditName()" class="edit-name-btn">✏️</button>
                     </div>
                     <div id="edit-name-input-container" class="hidden">
@@ -67,7 +79,7 @@
                         <button onclick="saveUserName()" class="btn-small">💾</button>
                     </div>
                     <div class="session-code-wrapper">
-                        <span id="session-code-display">Code: ••••••••</span>
+                        <span id="session-code-display">Código: ••••••••</span>
                         <button id="toggle-code-btn" onclick="toggleCodeVisibility()">👁️</button>
                     </div>
                 </div>
@@ -75,61 +87,63 @@
             
             <div class="header-actions">
                 <button onclick="toggleNotifications()" class="btn-action btn-blue-outline notif-btn-wrapper">
-                    🔔 Notifications <span id="notif-badge" class="notif-badge hidden">0</span>
+                    🔔 Avisos <span id="notif-badge" class="notif-badge hidden">0</span>
                 </button>
-                <button onclick="toggleSettings()" class="btn-action btn-blue-outline">⚙️ Settings</button>
-                <button onclick="shareDashboard()" class="btn-action btn-blue">📸 Capture</button>
-                <button onclick="logout()" class="btn-action btn-red">Exit</button>
+                <button onclick="toggleSettings()" class="btn-action btn-blue-outline">⚙️ Ajustes</button>
+                <button onclick="shareDashboard()" class="btn-action btn-blue">📸 Capturar</button>
+                <button onclick="logout()" class="btn-action btn-red">Salir</button>
             </div>
         </header>
 
         <div id="notifications-panel" class="notifications-panel card-effect hidden">
             <div class="notif-header">
-                <h3>Notifications</h3>
-                <button onclick="clearNotifications()" class="btn-small-text">Clear All</button>
+                <h3>Notificaciones y Revisiones</h3>
+                <button onclick="clearNotifications()" class="btn-small-text">Limpiar Todo</button>
             </div>
             <div id="notifications-list" class="notif-list">
-                <p class="empty-notif">No notifications yet.</p>
+                <p class="empty-notif">Sin notificaciones recientes.</p>
             </div>
         </div>
 
         <div id="settings-panel" class="settings-panel card-effect hidden">
-            <h3>Theme Settings</h3>
+            <h3>Ajustes de Tema</h3>
             <div class="theme-buttons">
-                <button onclick="setTheme('light')" class="btn-action btn-blue-outline">☀️ Light Mode</button>
-                <button onclick="setTheme('dark')" class="btn-action btn-blue-outline">🌙 Dark Mode</button>
+                <button onclick="setTheme('light')" class="btn-action btn-blue-outline">☀️ Modo Claro</button>
+                <button onclick="setTheme('dark')" class="btn-action btn-blue-outline">🌙 Modo Oscuro</button>
             </div>
         </div>
 
         <section class="staff-section card-effect">
             <div class="input-group">
-                <label>Driver Name:</label>
-                <input type="text" id="driver-name-input" onchange="saveStaffData()" placeholder="Enter driver name">
+                <label>Nombre del Conductor (Driver):</label>
+                <input type="text" id="driver-name-input" onchange="saveStaffData()" placeholder="Ingrese nombre del chofer">
             </div>
             <div class="input-group">
-                <label>Dispatcher Name:</label>
-                <input type="text" id="dispatcher-name-input" onchange="saveStaffData()" placeholder="Enter dispatcher name">
+                <label>Nombre del Despachador (Dispatcher):</label>
+                <input type="text" id="dispatcher-name-input" onchange="saveStaffData()" placeholder="Ingrese nombre del despachador">
             </div>
         </section>
 
         <section class="table-section card-effect">
             <div class="table-header">
-                <div>Name</div>
-                <div>Freight ($)</div>
-                <div>Delivery Date</div>
-                <div>Received Date</div>
-                <div>Time Reg.</div>
-                <div>Status</div>
-                <div>Attachment</div>
+                <div>Nombre</div>
+                <div>Flete ($)</div>
+                <div>Fecha Entrega</div>
+                <div>Fecha Recibido</div>
+                <div>Hora Reg.</div>
+                <div>Delivery</div>
+                <div>Sometida</div>
+                <div>Adjunto</div>
             </div>
             <div id="rows-container" class="rows-container"></div>
             
             <div class="table-actions">
-                <button onclick="addNewRow()" class="btn-action btn-blue btn-add-row">➕ Add Row</button>
+                <button onclick="addNewRow()" class="btn-action btn-blue btn-add-row">➕ Añadir Carga</button>
             </div>
         </section>
     </div>
 
+    <!-- OBSERVER / SUPERVISOR DASHBOARD -->
     <div id="observer-dashboard" class="dashboard-container hidden">
         <header class="dashboard-header card-effect">
             <div class="user-profile">
@@ -148,21 +162,21 @@
                         <button onclick="saveObserverName()" class="btn-small">💾</button>
                     </div>
                     <div class="session-code-wrapper">
-                        <span id="observer-code-display">Code: ••••••••</span>
+                        <span id="observer-code-display">Código: ••••••••</span>
                         <button id="toggle-observer-code-btn" onclick="toggleObserverCodeVisibility()">👁️</button>
                     </div>
                 </div>
             </div>
 
             <div class="header-actions">
-                <button onclick="shareDashboard()" class="btn-action btn-blue">📸 Capture</button>
-                <button onclick="logout()" class="btn-action btn-red">Exit</button>
+                <button onclick="shareDashboard()" class="btn-action btn-blue">📸 Capturar</button>
+                <button onclick="logout()" class="btn-action btn-red">Salir</button>
             </div>
         </header>
 
         <div class="observer-bar card-effect">
-            <input type="text" id="add-target-code-input" placeholder="Enter 8-digit user code to supervise" maxlength="8">
-            <button onclick="addAccountToObserver()" class="btn-action btn-blue">+ Add Account (Max 8)</button>
+            <input type="text" id="add-target-code-input" placeholder="Código de 8 dígitos de usuario a supervisar" maxlength="8">
+            <button onclick="addAccountToObserver()" class="btn-action btn-blue">+ Vincular Cuenta (Máx 8)</button>
         </div>
 
         <div id="observer-grid-container" class="observer-grid"></div>
