@@ -1,1 +1,21 @@
-
+{
+  "short_name": "QuickGoXpress",
+  "name": "QUICKGOXPRESS Freight & Logistics",
+  "icons": [
+    {
+      "src": "./favicon.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "./favicon.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "./invoice.html",
+  "background_color": "#0a0f1d",
+  "theme_color": "#00d2ff",
+  "display": "standalone",
+  "orientation": "portrait"
+}
