@@ -4,7 +4,6 @@
   -----------------------------------------------------------------------------------
   AUTOR: Raul Hernandez
   SISTEMA: QUICKGOXPRESS - Plataforma de Gestión y Supervisión Logística
-  AÑO: 2026
   ===================================================================================
 */
 
@@ -21,13 +20,13 @@ const firebaseConfig = {
 let database = null;
 let useFirebase = false;
 
-if (firebaseConfig.apiKey && firebaseConfig.apiKey !== "YOUR_API_KEY_HERE" && !firebaseConfig.apiKey.includes("TU_API_KEY")) {
+if (firebaseConfig.apiKey && firebaseConfig.apiKey !== "YOUR_API_KEY_HERE") {
     try {
         firebase.initializeApp(firebaseConfig);
         database = firebase.database();
         useFirebase = true;
     } catch (e) {
-        console.warn("Firebase initialization failed, switching to offline mode:", e);
+        console.warn("Firebase no inicializado. Cambiando a modo local:", e);
     }
 }
 
@@ -43,8 +42,7 @@ let observerTrackedCodes = [];
 
 const DEFAULT_AVATAR = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' fill='%23a0aec0'><circle cx='50' cy='50' r='48' fill='%23e2e8f0'/><circle cx='50' cy='38' r='18'/><path d='M50 62c-18 0-32 8-32 20h64c0-12-14-20-32-20z'/></svg>";
 
-// --- NAVEGACIÓN Y PANTALLAS DE AUTENTICACIÓN ---
-
+// --- NAVEGACIÓN ---
 function showRegister() {
     document.getElementById('auth-options').classList.add('hidden');
     document.getElementById('register-form').classList.remove('hidden');
@@ -69,26 +67,28 @@ function backToAuth() {
     document.getElementById('auth-options').classList.remove('hidden');
 }
 
-// --- CREACIÓN DE CUENTA E INICIO DE SESIÓN ---
-
+// --- AUTENTICACIÓN Y GENERACIÓN ---
 function generateCode() {
     const randomCode = Math.floor(10000000 + Math.random() * 90000000).toString();
 
     const newUser = {
-        username: 'Username',
+        username: 'Usuario',
         driverName: '',
         dispatcherName: '',
         avatar: DEFAULT_AVATAR,
         theme: 'dark',
         notifications: [],
-        rowsData: Array(12).fill(null).map((_, i) => ({
+        rowsData: Array(8).fill(null).map((_, i) => ({
             id: i + 1,
-            nombre: `Person ${i + 1}`,
+            nombre: `Carga ${i + 1}`,
             carga: '',
             fechaEntrega: '',
             fechaRecibido: '',
             horaModificacion: '',
             activo: false,
+            sometida: false,
+            mcNumber: '',
+            showMcInput: true,
             archivo: '',
             archivoNombre: '',
             archivoTipo: ''
@@ -104,8 +104,6 @@ function generateCode() {
                     displayGeneratedCode(randomCode);
                 });
             }
-        }).catch(() => {
-            alert("Error writing to cloud database.");
         });
     } else {
         let users = JSON.parse(localStorage.getItem('quickgo_offline_users')) || {};
@@ -121,8 +119,8 @@ function generateCode() {
 
 function displayGeneratedCode(code) {
     document.getElementById('generated-code-display').innerHTML = `
-        Your Access Code: <br><span style="font-size: 1.8rem; color: #00d2ff; font-weight: bold;">${code}</span><br>
-        <small style="color:#94a3b8;">Save it to log in next time.</small>
+        Tu Código de Acceso: <br><span style="font-size: 1.8rem; color: #00d2ff; font-weight: bold;">${code}</span><br>
+        <small style="color:#94a3b8;">Guárdalo bien para iniciar sesión.</small>
     `;
 }
 
@@ -130,7 +128,7 @@ function login() {
     const codeInput = document.getElementById('login-code').value.trim();
 
     if (codeInput.length !== 8 || isNaN(codeInput)) {
-        alert("Please enter a valid 8-digit numeric code.");
+        alert("Por favor introduce un código de 8 dígitos numéricos válido.");
         return;
     }
 
@@ -143,10 +141,8 @@ function login() {
                 localStorage.setItem('quickgo_is_observer', 'false');
                 loadDashboard();
             } else {
-                alert("This code does not exist in database.");
+                alert("El código no existe en el sistema.");
             }
-        }).catch(() => {
-            alert("Connection error. Please try again.");
         });
     } else {
         let users = JSON.parse(localStorage.getItem('quickgo_offline_users')) || {};
@@ -157,18 +153,17 @@ function login() {
             localStorage.setItem('quickgo_is_observer', 'false');
             loadDashboard();
         } else {
-            alert("This code does not exist offline.");
+            alert("El código no existe localmente.");
         }
     }
 }
 
-// --- MODO OBSERVADOR / SUPERVISOR ---
-
+// --- MODO SUPERVISOR / OBSERVADOR ---
 function loginAsObserver() {
     const codeInput = document.getElementById('observer-code-input').value.trim();
 
     if (codeInput !== "SUPERVISOR123" && (codeInput.length !== 8 || isNaN(codeInput))) {
-        alert("Please enter a valid supervisor code (e.g. SUPERVISOR123 or an 8-digit code).");
+        alert("Introduce un código de supervisor válido.");
         return;
     }
 
@@ -187,8 +182,7 @@ function loadObserverDashboard() {
 
     if (useFirebase) {
         database.ref('observers/' + currentObserverCode + '/name').once('value').then((snapshot) => {
-            const savedName = snapshot.val();
-            document.getElementById('display-observer-name').innerText = savedName || "Supervisor";
+            document.getElementById('display-observer-name').innerText = snapshot.val() || "Supervisor";
         });
 
         database.ref('observers/' + currentObserverCode + '/trackedCodes').once('value').then((snapshot) => {
@@ -210,52 +204,21 @@ function loadObserverDashboard() {
     document.getElementById('observer-avatar').src = DEFAULT_AVATAR;
 }
 
-function enableEditObserverName() {
-    const container = document.getElementById('edit-observer-name-container');
-    const input = document.getElementById('edit-observer-name-input');
-    const currentName = document.getElementById('display-observer-name').innerText;
-
-    input.value = currentName;
-    container.classList.remove('hidden');
-    input.focus();
-}
-
-function saveObserverName() {
-    const newName = document.getElementById('edit-observer-name-input').value.trim();
-    if (!newName) return;
-
-    document.getElementById('display-observer-name').innerText = newName;
-
-    if (useFirebase) {
-        database.ref('observers/' + currentObserverCode).update({ name: newName });
-    } else {
-        localStorage.setItem(`quickgo_observer_name_${currentObserverCode}`, newName);
-    }
-
-    document.getElementById('edit-observer-name-container').classList.add('hidden');
-}
-
-function handleObserverNameKeypress(event) {
-    if (event.key === 'Enter') {
-        saveObserverName();
-    }
-}
-
 function addAccountToObserver() {
     const targetCode = document.getElementById('add-target-code-input').value.trim();
 
     if (targetCode.length !== 8 || isNaN(targetCode)) {
-        alert("Please enter a valid 8-digit user code.");
+        alert("Introduce un código de usuario válido de 8 dígitos.");
         return;
     }
 
     if (observerTrackedCodes.length >= 8) {
-        alert("Maximum limit of 8 monitored accounts reached.");
+        alert("Límite máximo de 8 cuentas a supervisar alcanzado.");
         return;
     }
 
     if (observerTrackedCodes.includes(targetCode)) {
-        alert("This account is already being monitored.");
+        alert("Esta cuenta ya está vinculada.");
         return;
     }
 
@@ -268,7 +231,7 @@ function addAccountToObserver() {
                 notifyUserAboutObserver(targetCode);
                 renderObserverGrid();
             } else {
-                alert("Account not found in database.");
+                alert("Cuenta no encontrada en la base de datos.");
             }
         });
     } else {
@@ -280,7 +243,7 @@ function addAccountToObserver() {
             notifyUserAboutObserver(targetCode);
             renderObserverGrid();
         } else {
-            alert("Account not found offline.");
+            alert("Cuenta no encontrada localmente.");
         }
     }
 }
@@ -291,7 +254,7 @@ function notifyUserAboutObserver(targetCode) {
     const dateString = now.toISOString().split('T')[0];
 
     const newNotification = {
-        message: `El Observador (Código: ${currentObserverCode || 'Supervisor'}) ha abierto y revisado tu cuenta.`,
+        message: `El Observador / Supervisor ha abierto y revisado tu cuenta.`,
         date: dateString,
         time: timeString,
         timestamp: now.getTime()
@@ -303,23 +266,15 @@ function notifyUserAboutObserver(targetCode) {
             if (!Array.isArray(notifs)) notifs = Object.values(notifs);
             notifs.push(newNotification);
             database.ref('users/' + targetCode + '/notifications').set(notifs);
-            database.ref('users/' + targetCode + '/observerSessionStart').set(now.getTime());
         });
     } else {
         let users = JSON.parse(localStorage.getItem('quickgo_offline_users')) || {};
         if (users[targetCode]) {
             if (!users[targetCode].notifications) users[targetCode].notifications = [];
             users[targetCode].notifications.push(newNotification);
-            users[targetCode].observerSessionStart = now.getTime();
             localStorage.setItem('quickgo_offline_users', JSON.stringify(users));
         }
     }
-}
-
-function removeAccountFromObserver(code) {
-    observerTrackedCodes = observerTrackedCodes.filter(c => c !== code);
-    saveObserverTrackedCodes();
-    renderObserverGrid();
 }
 
 function saveObserverTrackedCodes() {
@@ -337,36 +292,32 @@ function renderObserverGrid() {
     gridContainer.innerHTML = '';
 
     if (observerTrackedCodes.length === 0) {
-        gridContainer.innerHTML = `<p style="grid-column: 1/-1; text-align: center; color: var(--text-muted); padding: 40px;">No accounts added yet. Enter an 8-digit user code above to supervise.</p>`;
+        gridContainer.innerHTML = `<p style="grid-column: 1/-1; text-align: center; color: var(--text-muted); padding: 40px;">No hay cuentas vinculadas. Introduce arriba un código para supervisar.</p>`;
         return;
     }
 
     observerTrackedCodes.forEach((code) => {
-        notifyUserAboutObserver(code);
-
         const card = document.createElement('div');
         card.className = 'card-effect observer-account-section';
-        card.style.marginBottom = '25px';
         card.id = `obs-card-${code}`;
 
         card.innerHTML = `
             <div class="observer-card-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px; margin-bottom: 15px;">
                 <div>
-                    <h3 id="obs-name-${code}" style="margin: 0; font-size: 1.2rem;">Loading...</h3>
+                    <h3 id="obs-name-${code}" style="margin: 0; font-size: 1.2rem;">Cargando...</h3>
                     <small style="color: var(--text-muted);">Código: ${code}</small>
                 </div>
-                <button onclick="removeAccountFromObserver('${code}')" class="btn-small-text" style="color: var(--primary-red); cursor: pointer;">❌ Eliminar</button>
+                <button onclick="removeAccountFromObserver('${code}')" class="btn-small-text">❌ Eliminar</button>
             </div>
             <div class="observer-card-body" id="obs-body-${code}">
-                <p style="color: var(--text-muted);">Cargando datos detallados...</p>
+                <p style="color: var(--text-muted);">Cargando datos...</p>
             </div>
         `;
         gridContainer.appendChild(card);
 
         if (useFirebase) {
             database.ref('users/' + code).on('value', (snapshot) => {
-                const userData = snapshot.val();
-                updateObserverCardUI(code, userData);
+                updateObserverCardUI(code, snapshot.val());
             });
         } else {
             let users = JSON.parse(localStorage.getItem('quickgo_offline_users')) || {};
@@ -381,29 +332,34 @@ function updateObserverCardUI(code, userData) {
 
     if (!nameEl || !bodyEl || !userData) return;
 
-    nameEl.innerText = userData.username || `User ${code}`;
+    nameEl.innerText = userData.username || `Usuario ${code}`;
 
     let rowsHtml = '';
     const rows = userData.rowsData || [];
 
     rows.forEach((r, index) => {
-        const timeDisplay = r.horaModificacion ? `<span style="color: var(--primary-blue); font-size: 0.75rem;">🕒 ${r.horaModificacion}</span>` : '<span style="color: var(--text-muted); font-size: 0.75rem;">--:--</span>';
-        
-        // Botón para ver adjunto desde el modo Observador
         const fileBtn = r.archivo 
-            ? `<button onclick="viewObserverFile('${code}', ${index})" class="btn-small" style="font-size:0.75rem; padding: 2px 6px;">📄 Ver Archivo</button>`
+            ? `<button onclick="viewObserverFile('${code}', ${index})" class="btn-small" style="font-size:0.75rem; padding: 2px 6px;">📄 Archivo</button>`
             : '<span style="color: var(--text-muted); font-size: 0.75rem;">Sin archivo</span>';
+
+        const mcDisplay = (r.sometida && r.mcNumber) 
+            ? `<br><span style="color:#00d2ff; font-weight:bold; font-size:0.75rem;">MC: #${r.mcNumber}</span>`
+            : '';
 
         rowsHtml += `
             <tr style="border-bottom: 1px dashed var(--border-color); font-size: 0.85rem;">
                 <td style="padding: 6px 4px;"><strong>#${index + 1}</strong> ${r.nombre || ''}</td>
                 <td style="padding: 6px 4px;">$${r.carga || '0.00'}</td>
-                <td style="padding: 6px 4px;">${r.fechaEntrega || 'N/A'}</td>
-                <td style="padding: 6px 4px;">${timeDisplay}</td>
                 <td style="padding: 6px 4px;">
                     <span class="status-label ${r.activo ? 'status-delivered' : 'status-not-delivered'}">
-                        ${r.activo ? 'Delivered' : 'Pending'}
+                        ${r.activo ? 'Entregada' : 'Pendiente'}
                     </span>
+                </td>
+                <td style="padding: 6px 4px;">
+                    <span class="status-label ${r.sometida ? 'status-submitted' : 'status-not-submitted'}">
+                        ${r.sometida ? 'Sometida' : 'No Sometida'}
+                    </span>
+                    ${mcDisplay}
                 </td>
                 <td style="padding: 6px 4px;">${fileBtn}</td>
             </tr>
@@ -411,90 +367,32 @@ function updateObserverCardUI(code, userData) {
     });
 
     bodyEl.innerHTML = `
-        <p style="font-size:0.9rem; margin-bottom: 4px;"><strong>Driver:</strong> ${userData.driverName || 'N/A'}</p>
-        <p style="font-size:0.9rem; margin-bottom: 12px;"><strong>Dispatcher:</strong> ${userData.dispatcherName || 'N/A'}</p>
-        <div style="max-height: 280px; overflow-y: auto; overflow-x: auto;">
+        <p style="font-size:0.85rem; margin-bottom: 4px;"><strong>Conductor:</strong> ${userData.driverName || 'N/A'}</p>
+        <p style="font-size:0.85rem; margin-bottom: 10px;"><strong>Despachador:</strong> ${userData.dispatcherName || 'N/A'}</p>
+        <div style="max-height: 250px; overflow-y: auto;">
             <table style="width: 100%; border-collapse: collapse; text-align: left;">
                 <thead>
                     <tr style="border-bottom: 1px solid var(--border-color); font-size: 0.8rem; color: var(--primary-blue);">
-                        <th style="padding: 4px;">Nombre</th>
                         <th style="padding: 4px;">Carga</th>
-                        <th style="padding: 4px;">Entrega</th>
-                        <th style="padding: 4px;">Hora Reg.</th>
-                        <th style="padding: 4px;">Estado</th>
+                        <th style="padding: 4px;">Flete</th>
+                        <th style="padding: 4px;">Delivery</th>
+                        <th style="padding: 4px;">Sometida / MC</th>
                         <th style="padding: 4px;">Adjunto</th>
                     </tr>
                 </thead>
-                <tbody>
-                    ${rowsHtml}
-                </tbody>
+                <tbody>${rowsHtml}</tbody>
             </table>
         </div>
     `;
 }
 
-// --- VISUALIZACIÓN DE ARCHIVOS ADJUNTOS ---
-
-function viewFile(index) {
-    const row = currentRowsData[index];
-    if (!row || !row.archivo) {
-        alert("No hay ningún archivo adjunto en esta fila.");
-        return;
-    }
-    openBase64InNewTab(row.archivo, row.archivoNombre);
+function removeAccountFromObserver(code) {
+    observerTrackedCodes = observerTrackedCodes.filter(c => c !== code);
+    saveObserverTrackedCodes();
+    renderObserverGrid();
 }
 
-function viewObserverFile(userCode, index) {
-    if (useFirebase) {
-        database.ref(`users/${userCode}/rowsData/${index}`).once('value').then((snapshot) => {
-            const row = snapshot.val();
-            if (row && row.archivo) {
-                openBase64InNewTab(row.archivo, row.archivoNombre);
-            } else {
-                alert("El usuario no ha subido un archivo para esta fila.");
-            }
-        });
-    } else {
-        let users = JSON.parse(localStorage.getItem('quickgo_offline_users')) || {};
-        if (users[userCode] && users[userCode].rowsData && users[userCode].rowsData[index]) {
-            const row = users[userCode].rowsData[index];
-            if (row && row.archivo) {
-                openBase64InNewTab(row.archivo, row.archivoNombre);
-            } else {
-                alert("El usuario no ha subido un archivo para esta fila.");
-            }
-        }
-    }
-}
-
-function openBase64InNewTab(base64Data, fileName) {
-    const win = window.open();
-    if (win) {
-        win.document.write(`
-            <html>
-                <head>
-                    <title>${fileName || 'Vista de Archivo'}</title>
-                    <style>
-                        body { margin: 0; background-color: #0b1120; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; color: #fff; font-family: sans-serif; }
-                        img, iframe { max-width: 90%; max-height: 85vh; border-radius: 8px; box-shadow: 0 0 20px rgba(0,0,0,0.5); }
-                        .btn-dl { margin-top: 15px; padding: 10px 20px; background: #00d2ff; color: #000; border: none; font-weight: bold; border-radius: 6px; cursor: pointer; text-decoration: none; }
-                    </style>
-                </head>
-                <body>
-                    ${base64Data.startsWith('data:image/') 
-                        ? `<img src="${base64Data}" alt="Adjunto" />` 
-                        : `<iframe src="${base64Data}" style="width:80%; height:80vh;"></iframe>`}
-                    <a class="btn-dl" href="${base64Data}" download="${fileName || 'archivo_adjunto'}">📥 Descargar Archivo</a>
-                </body>
-            </html>
-        `);
-    } else {
-        alert("Por favor permite las ventanas emergentes (pop-ups) en tu navegador para ver el archivo.");
-    }
-}
-
-// --- CARGA Y MANEJO DE USUARIOS REGULARES ---
-
+// --- MANEJO DEL USUARIO Y TABLA PRINCIPAL ---
 function loadDashboard() {
     document.getElementById('auth-screen').classList.add('hidden');
     document.getElementById('observer-dashboard').classList.add('hidden');
@@ -514,7 +412,7 @@ function loadDashboard() {
 }
 
 function renderUserData(data) {
-    document.getElementById('display-user-name').innerText = data.username || 'Username';
+    document.getElementById('display-user-name').innerText = data.username || 'Usuario';
     document.getElementById('user-avatar').src = data.avatar || DEFAULT_AVATAR;
     document.getElementById('driver-name-input').value = data.driverName || '';
     document.getElementById('dispatcher-name-input').value = data.dispatcherName || '';
@@ -533,19 +431,51 @@ function renderRowsTable() {
     container.innerHTML = '';
 
     currentRowsData.forEach((row, index) => {
+        if (row.showMcInput === undefined) row.showMcInput = true;
+
         const rowDiv = document.createElement('div');
         rowDiv.className = 'list-item';
 
         const fileActionsHtml = row.archivo 
             ? `
                 <div style="display:flex; gap: 4px;">
-                    <button onclick="viewFile(${index})" class="btn-small" style="background:#00d2ff; color:#000;">📄 View</button>
-                    <button onclick="document.getElementById('file-${index}').click()" class="btn-small" style="background:var(--border-color);">✏️ Change</button>
+                    <button onclick="viewFile(${index})" class="btn-small" style="background:#00d2ff; color:#000; padding:4px 8px; font-size:0.75rem;">📄 Ver</button>
+                    <button onclick="document.getElementById('file-${index}').click()" class="btn-small" style="background:var(--border-color); padding:4px 8px; font-size:0.75rem;">✏️</button>
                 </div>
               `
             : `
-                <button onclick="document.getElementById('file-${index}').click()" class="btn-small">📁 Add</button>
+                <button onclick="document.getElementById('file-${index}').click()" class="btn-small" style="padding:4px 8px; font-size:0.75rem;">📁 Subir</button>
               `;
+
+        let mcSectionHtml = '';
+        if (row.sometida) {
+            const eyeIcon = row.showMcInput ? '👁️' : '👁️‍🗨️';
+            
+            let mcInputOrBadge = '';
+            if (row.showMcInput) {
+                mcInputOrBadge = `<input type="text" class="mc-input" value="${row.mcNumber || ''}" placeholder="Escribe MC #" onchange="updateRowData(${index}, 'mcNumber', this.value)">`;
+            } else {
+                mcInputOrBadge = `<div class="mc-badge">MC: #${row.mcNumber || 'S/N'}</div>`;
+            }
+
+            mcSectionHtml = `
+                <div class="mc-container">
+                    <div class="mc-header-toggle">
+                        <span onclick="toggleRowSubmitted(${index})" class="status-label status-submitted" style="flex:1;">
+                            Sometida
+                        </span>
+                        <button onclick="toggleMcEye(${index})" class="btn-eye-toggle" title="Ocultar/Mostrar entrada de MC">${eyeIcon}</button>
+                    </div>
+                    ${mcInputOrBadge}
+                </div>
+            `;
+        } else {
+            mcSectionHtml = `
+                <span onclick="toggleRowSubmitted(${index})" class="status-label status-not-submitted">
+                    No Sometida
+                </span>
+            `;
+        }
 
         rowDiv.innerHTML = `
             <div><input type="text" value="${row.nombre || ''}" onchange="updateRowData(${index}, 'nombre', this.value)"></div>
@@ -557,9 +487,10 @@ function renderRowsTable() {
             </div>
             <div>
                 <span onclick="toggleRowStatus(${index})" class="status-label ${row.activo ? 'status-delivered' : 'status-not-delivered'}">
-                    ${row.activo ? 'Delivered' : 'Pending'}
+                    ${row.activo ? 'Entregada' : 'Pendiente'}
                 </span>
             </div>
+            <div>${mcSectionHtml}</div>
             <div>
                 <input type="file" id="file-${index}" style="display:none;" onchange="handleFileUpload(event, ${index})">
                 ${fileActionsHtml}
@@ -577,12 +508,15 @@ function getCurrentFormattedTime() {
 function addNewRow() {
     const newRow = {
         id: currentRowsData.length + 1,
-        nombre: `Person ${currentRowsData.length + 1}`,
+        nombre: `Carga ${currentRowsData.length + 1}`,
         carga: '',
         fechaEntrega: '',
         fechaRecibido: '',
         horaModificacion: getCurrentFormattedTime(),
         activo: false,
+        sometida: false,
+        mcNumber: '',
+        showMcInput: true,
         archivo: '',
         archivoNombre: '',
         archivoTipo: ''
@@ -602,6 +536,24 @@ function updateRowData(index, field, value) {
 function toggleRowStatus(index) {
     currentRowsData[index].activo = !currentRowsData[index].activo;
     currentRowsData[index].horaModificacion = getCurrentFormattedTime();
+    renderRowsTable();
+    saveDataToStorage();
+}
+
+function toggleRowSubmitted(index) {
+    currentRowsData[index].sometida = !currentRowsData[index].sometida;
+    if (!currentRowsData[index].sometida) {
+        currentRowsData[index].mcNumber = '';
+    } else {
+        currentRowsData[index].showMcInput = true;
+    }
+    currentRowsData[index].horaModificacion = getCurrentFormattedTime();
+    renderRowsTable();
+    saveDataToStorage();
+}
+
+function toggleMcEye(index) {
+    currentRowsData[index].showMcInput = !currentRowsData[index].showMcInput;
     renderRowsTable();
     saveDataToStorage();
 }
@@ -653,8 +605,49 @@ function saveDataToStorage() {
     }
 }
 
-// --- UTILIDADES, EDICIÓN Y AJUSTES ---
+// --- VISUALIZACIÓN DE ARCHIVOS ---
+function viewFile(index) {
+    const row = currentRowsData[index];
+    if (!row || !row.archivo) return alert("No hay archivo adjunto.");
+    openBase64InNewTab(row.archivo, row.archivoNombre);
+}
 
+function viewObserverFile(userCode, index) {
+    if (useFirebase) {
+        database.ref(`users/${userCode}/rowsData/${index}`).once('value').then((snapshot) => {
+            const row = snapshot.val();
+            if (row && row.archivo) openBase64InNewTab(row.archivo, row.archivoNombre);
+            else alert("Sin archivo adjunto.");
+        });
+    } else {
+        let users = JSON.parse(localStorage.getItem('quickgo_offline_users')) || {};
+        if (users[userCode]?.rowsData[index]?.archivo) {
+            openBase64InNewTab(users[userCode].rowsData[index].archivo, users[userCode].rowsData[index].archivoNombre);
+        } else {
+            alert("Sin archivo adjunto.");
+        }
+    }
+}
+
+function openBase64InNewTab(base64Data, fileName) {
+    const win = window.open();
+    if (win) {
+        win.document.write(`
+            <html>
+                <head><title>${fileName || 'Vista de Archivo'}</title></head>
+                <body style="margin:0; background:#0b1120; display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100vh; color:#fff; font-family:sans-serif;">
+                    ${base64Data.startsWith('data:image/') 
+                        ? `<img src="${base64Data}" style="max-width:90%; max-height:85vh; border-radius:8px;" />` 
+                        : `<iframe src="${base64Data}" style="width:80%; height:80vh; border:none;"></iframe>`}
+                    <br>
+                    <a href="${base64Data}" download="${fileName || 'adjunto'}" style="padding:10px 20px; background:#00d2ff; color:#000; font-weight:bold; text-decoration:none; border-radius:6px;">📥 Descargar Archivo</a>
+                </body>
+            </html>
+        `);
+    }
+}
+
+// --- PERFIL Y UTILIDADES ---
 function enableEditName() {
     document.getElementById('edit-name-input-container').classList.remove('hidden');
     document.getElementById('edit-user-name-input').value = document.getElementById('display-user-name').innerText;
@@ -687,9 +680,7 @@ function toggleCodeVisibility() {
 
 function updateCodeDisplay() {
     const el = document.getElementById('session-code-display');
-    if (el) {
-        el.innerText = isCodeVisible ? `Code: ${currentUserCode}` : 'Code: ••••••••';
-    }
+    if (el) el.innerText = isCodeVisible ? `Código: ${currentUserCode}` : 'Código: ••••••••';
 }
 
 function toggleObserverCodeVisibility() {
@@ -699,9 +690,7 @@ function toggleObserverCodeVisibility() {
 
 function updateObserverCodeDisplay() {
     const el = document.getElementById('observer-code-display');
-    if (el) {
-        el.innerText = isObserverCodeVisible ? `Code: ${currentObserverCode}` : 'Code: ••••••••';
-    }
+    if (el) el.innerText = isObserverCodeVisible ? `Código: ${currentObserverCode}` : 'Código: ••••••••';
 }
 
 function changeAvatar(event) {
@@ -737,11 +726,8 @@ function changeObserverAvatar(event) {
 
 function setTheme(theme) {
     currentTheme = theme;
-    if (theme === 'light') {
-        document.body.classList.add('light-theme');
-    } else {
-        document.body.classList.remove('light-theme');
-    }
+    if (theme === 'light') document.body.classList.add('light-theme');
+    else document.body.classList.remove('light-theme');
 }
 
 function toggleNotifications() {
@@ -761,7 +747,7 @@ function renderNotifications(notifs) {
     const notifArray = Array.isArray(notifs) ? notifs : Object.values(notifs || {});
 
     if (notifArray.length === 0) {
-        list.innerHTML = `<p class="empty-notif">No notifications yet.</p>`;
+        list.innerHTML = `<p class="empty-notif">Sin notificaciones.</p>`;
         badge.classList.add('hidden');
         return;
     }
@@ -769,13 +755,10 @@ function renderNotifications(notifs) {
     badge.innerText = notifArray.length;
     badge.classList.remove('hidden');
 
-    notifArray.reverse().forEach((n) => {
+    notifArray.slice().reverse().forEach((n) => {
         const card = document.createElement('div');
-        card.className = 'notif-card';
-        card.innerHTML = `
-            <span class="notif-msg">${n.message}</span>
-            <span class="notif-time">${n.date} - ${n.time}</span>
-        `;
+        card.style.cssText = "background: var(--input-bg); border: 1px solid var(--border-color); padding: 8px 12px; border-radius: 6px; font-size: 0.85rem; margin-bottom: 6px;";
+        card.innerHTML = `<div>${n.message}</div><small style="color:var(--text-muted);">${n.date} - ${n.time}</small>`;
         list.appendChild(card);
     });
 }
@@ -793,10 +776,9 @@ function clearNotifications() {
 }
 
 function shareDashboard() {
-    const element = document.body;
-    html2canvas(element).then((canvas) => {
+    html2canvas(document.body).then((canvas) => {
         const link = document.createElement('a');
-        link.download = `QuickGoXpress-Capture-${Date.now()}.png`;
+        link.download = `QuickGoXpress-Captura-${Date.now()}.png`;
         link.href = canvas.toDataURL();
         link.click();
     });
@@ -830,3 +812,18 @@ window.addEventListener('DOMContentLoaded', () => {
         }
     }
 });
+
+// ===================================================================================
+// REGISTRO DE SERVICE WORKER PARA PERMITIR DESCARGA COMO APLICACIÓN (PWA)
+// ===================================================================================
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+            .then((registration) => {
+                console.log('Service Worker registrado con éxito:', registration.scope);
+            })
+            .catch((error) => {
+                console.log('Error al registrar Service Worker:', error);
+            });
+    });
+}
